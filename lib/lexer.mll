@@ -50,6 +50,8 @@ rule read_token =
   | "function" { FUN }
   | "," { ARGSEP }  
   | "int" { INT }
+  | "bool" { BOOL }
+  | "address" { ADDR }
   | id { ID (Lexing.lexeme lexbuf) }
   | num { CONST (Lexing.lexeme lexbuf) }
   | newline { new_line lexbuf; read_token lexbuf }  

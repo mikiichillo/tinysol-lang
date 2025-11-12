@@ -36,13 +36,15 @@ open Ast
 %token CONSTR
 %token FUN
 %token INT
+%token BOOL
+%token ADDR
 %token RECEIVESEP
 %token SENDSEP
 %token TOKSEP
 %token ARGSEP
 
 (* sequences are reduced eagerly *)
-%left SKIP LBRACE ID WHILE IF ELSE DO
+%left SKIP LBRACE ID IF ELSE
 %nonassoc CMDSEP
 
 %left OR
@@ -53,7 +55,7 @@ open Ast
 %left MUL
 
 %start <contract> contract
-%type <decls> decls
+%type <decl> decl
 %type <cmd> cmd
 %type <args> args
 %type <expr> expr 
@@ -63,7 +65,7 @@ open Ast
 %%
 
 contract:
-  | CONTRACT; c=ID; LBRACE; d = decls; RBRACE; EOF { Contract(c,d) }
+  | CONTRACT; c=ID; LBRACE; dl = list(decl); RBRACE; EOF { Contract(c,dl) }
 ;
 
 expr:
@@ -89,12 +91,20 @@ expr:
 cmd:
   | SKIP { Skip }
   | REQ; e = expr { Req(e) } 
-  | IF; e0 = expr; c1 = cmd; ELSE; c2 = cmd; { If(e0,c1,c2) }
-  | x = ID; TAKES; e=expr; { Assign(x,e) }
+  | x = ID; TAKES; e = expr { Assign(x,e) }
   | x = ID; SENDSEP; e=expr; TOKSEP; t = ID; { Send(x,e,t) }
   | f = ID; LPAREN; e=expr; RPAREN { Call(f,e) }
-  | c1 = cmd; CMDSEP; c2 = cmd; { Seq(c1,c2) } %prec CMDSEP
-  | LBRACE; c = cmd; RBRACE { c }
+  | c1 = cmd; CMDSEP; c2 = cmd { Seq(c1,c2) }
+  | IF e = expr; c1 = cmd ELSE c2 = cmd { If(e,c1,c2) }
+  | LBRACE; ds = list(decl) c = cmd; RBRACE { Decl (ds, c) }
+;
+
+decl:
+  | INT x = ID; CMDSEP { IntVar x }
+  | BOOL x = ID; CMDSEP { BoolVar x }
+  | ADDR x = ID; CMDSEP { AddrVar x }
+  | CONSTR; f = ID; LPAREN; a = args; RPAREN; LBRACE; c = cmd; RBRACE { Constr(f,a,c) }
+  | FUN; f = ID; LPAREN; a = args; RPAREN; LBRACE; c = cmd; RBRACE { Proc(f,a,c) }
 ;
 
 cmd_test:
@@ -107,13 +117,4 @@ args:
 arg:
   | x = ID { IntArg(x) }
   | RECEIVESEP; x = ID; TOKSEP; t = ID; { RcvArg(x,t) }
-;
-
-decls:
-  | d = separated_list(CMDSEP, decl) { d } ;
-
-decl:
-  | INT; x = ID; { IntVar(x) }
-  | CONSTR; f = ID; LPAREN; a = args; RPAREN; LBRACE; c = cmd; RBRACE { Constr(f,a,c) }
-  | FUN; f = ID; LPAREN; a = args; RPAREN; LBRACE; c = cmd; RBRACE { Proc(f,a,c) }
 ;

@@ -38,6 +38,7 @@ and cmd =
   | Req of expr              (* require(e) reverts if e is false *) 
   | Call of ide * expr       (* TODO: add actual parameters *)
   | CallExec of cmd          (* Runtime only: c is the cmd being reduced *)
+  | Decl of decls * cmd
 
 and arg =
   | IntArg of ide
@@ -45,8 +46,10 @@ and arg =
 
 and args = arg list
     
-type decl =
+and decl =
   | IntVar of ide 
+  | BoolVar of ide 
+  | AddrVar of ide 
   | Constr of ide * args * cmd
   | Proc of ide * args * cmd
 

@@ -1,8 +1,16 @@
 open Ast
 open Types
 
-let string_of_val = function
-  | n -> string_of_int n
+let string_of_exprval = function
+    Bool b -> string_of_bool b
+  | Int n  -> string_of_int n
+  | Addr s -> s
+
+let string_of_arg = function
+  | IntArg(x) -> x
+  | RcvArg(x,t) -> x ^ "?" ^ t
+
+let string_of_args = List.fold_left (fun s a -> s ^ (if s<>"" then "," else "") ^ (string_of_arg a)) ""
 
 let rec string_of_expr = function
     True -> "true"
@@ -31,15 +39,15 @@ and string_of_cmd = function
   | Req(e) -> "require " ^ string_of_expr e
   | Call(f,e) -> f ^ "(" ^ string_of_expr e ^ ")"
   | CallExec(c) -> "exec{" ^ string_of_cmd c ^ "}"
+  | Decl(dl,c) -> "{" 
+    ^ List.fold_left (fun s d -> s ^ (if s<>"" then "; " else "") ^ string_of_decl d) "" dl ^ ";" 
+    ^ string_of_cmd c 
+    ^ "}"
 
-let string_of_arg = function
-  | IntArg(x) -> x
-  | RcvArg(x,t) -> x ^ "?" ^ t
-
-let string_of_args = List.fold_left (fun s a -> s ^ (if s<>"" then "," else "") ^ (string_of_arg a)) ""
-
-let string_of_decl = function
+and string_of_decl = function
   | IntVar(x) -> "int " ^ x
+  | BoolVar(x) -> "bool " ^ x
+  | AddrVar(x) -> "address " ^ x
   | Constr(f,a,c) -> "constructor " ^ f ^ "(" ^ (string_of_args a) ^ ") {" ^ string_of_cmd c ^ "}"                 
   | Proc(f,a,c) -> "fun " ^ f ^ "(" ^ (string_of_args a) ^ ") {" ^ string_of_cmd c ^ "}"
 
@@ -47,9 +55,13 @@ let string_of_decls = List.fold_left (fun s d -> s ^ (if s<>"" then "; " else ""
 
 let string_of_contract (Contract(c,d)) = "contract " ^ c ^ " { " ^ (string_of_decls d) ^ " }"
 
+(*
 let string_of_env1 s x = match topenv s x with
-  | IVar l -> string_of_int l ^ "/" ^ x
+  | IVar v -> string_of_exprval v ^ "/" ^ x
   | IProc(a,c) -> "fun(" ^ string_of_args a ^ "){" ^ string_of_cmd c ^ "}/" ^ x
+*)
+
+let string_of_env1 _ _ = "NOT IMPLEMENTED"
 
 let rec string_of_env s = function
     [] -> ""
@@ -57,12 +69,9 @@ let rec string_of_env s = function
   | x::dom' -> (try string_of_env1 s x ^ "," ^ string_of_env s dom'
                 with _ -> string_of_env s dom')
 
-let string_of_mem1 (m,l) i =
-  assert (i<l);
-  string_of_val (m i) ^ "/" ^ string_of_int i
-
 let rec range a b = if b<a then [] else a::(range (a+1) b);;
 
+(*
 let string_of_mem (m,l) =
   List.fold_left (fun str i -> str ^ (try string_of_mem1 (m,l) i ^ "," with _ -> "")) "" (range 0 (l - 1))
 
@@ -72,11 +81,12 @@ let rec getlocs e = function
     | IVar l -> l::(getlocs e dom)
     | IProc(_,_) -> [])
     with _ -> getlocs e dom
+*)
 
 let string_of_state st dom =
-  "[" ^ string_of_env st dom ^ "], " ^
-  "[" ^ string_of_mem (getmem st,getloc st) ^ "]" ^ ", " ^
-  string_of_int (getloc st)
+  "[" ^ string_of_env st dom ^ "], "
+  (*  "[" ^ string_of_mem (getmem st,getloc st) ^ "]" ^ ", " ^ *)
+  (* string_of_int (getloc st) *)
 
 let rec union l1 l2 = match l1 with
     [] -> l2
@@ -109,10 +119,11 @@ and vars_of_cmd = function
   | Req(e) -> vars_of_expr e                    
   | Call(f,e) -> union [f] (vars_of_expr e)
   | CallExec(c) -> vars_of_cmd c
+  | Decl(_,c) -> vars_of_cmd c
 
 let string_of_conf vars = function
     St st -> string_of_state st vars
-  | Cmd(c,st) -> "<" ^ string_of_cmd c ^ ", " ^ string_of_state st vars ^ ">"
+  | Cmd(c,st,a) -> "<" ^ string_of_cmd c ^ ", " ^ string_of_state st vars ^ " , " ^ a ^ ">"
 
 let rec string_of_trace vars = function
     [] -> ""

@@ -28,7 +28,7 @@ let is_val = function
   | AddrConst _ -> true
   | _ -> false
 
-let rec eval_expr (st:state) (a:addr) = function
+let rec eval_expr (st : sysstate) (a : addr) = function
     True -> Bool true
   | False -> Bool false
   | Var x -> lookup st a x
@@ -79,6 +79,16 @@ let rec eval_expr (st:state) (a:addr) = function
       | _ -> raise (TypeError "Ge")
     )          
 
+let eval_var_decls (vdl : var_decl list) (e : env): env =
+  List.fold_left
+    (fun acc vd ->
+      match vd with
+        | IntVar x  -> bind acc x (Int 0)
+        | BoolVar x -> bind acc x (Bool false)
+        | AddrVar x -> bind acc x (Addr "0")
+    )
+    e
+    vdl
 
 (******************************************************************************)
 (*                       Small-step semantics of commands                     *)
@@ -90,9 +100,11 @@ let rec trace1_cmd = function
     | Skip -> St st
     | Assign(x,e) -> (
         (* first tries to update environment if x is bound there *)
-        try St (update_env st x (eval_expr st a e)) 
+        try 
+          St (update_env st x (eval_expr st a e)) 
         (* if not, tries to update storage of a *)
-        with _ -> St (update_storage st a x (eval_expr st a e)))
+        with _ -> 
+          St (update_storage st a x (eval_expr st a e)))
     | Seq(c1,c2) -> (match trace1_cmd (Cmd(c1,st,a)) with
           St st1 -> Cmd(c2,st1,a)
         | Cmd(c1',st1,a) -> Cmd(Seq(c1',c2),st1,a))
@@ -103,7 +115,14 @@ let rec trace1_cmd = function
     | Req(_) -> failwith ("TODO")
     | Send(_,_,_) -> failwith ("TODO")
     | Call(_,_) -> failwith "TODO"
-    | Decl(dl,c) -> failwith "TODO"
+    | Block(vdl,c) ->
+      let e = topenv st in
+      let e' = eval_var_decls vdl e in
+      let st' = (get_storage st, e'::get_envstack st) in
+      Cmd(ExecBlock c, st', a)
+    | ExecBlock(c) -> (match trace1_cmd (Cmd(c,st,a)) with
+        | St st -> St (get_storage st, popenv st)
+        | Cmd(c1',st1,a') -> Cmd(ExecBlock(c1'),st1,a'))
     | _ -> failwith "TODO")
 
 (* (match (topenv st f,eval_expr st e) with
@@ -137,7 +156,7 @@ let rec trace_rec_cmd n t =
 
 
 let trace_cmd n_steps (c:cmd) (a:addr) =
-  trace_rec_cmd n_steps (Cmd(c,[botstorage,botenv],a))
+  trace_rec_cmd n_steps (Cmd(c,(botstorage,[botenv]),a))
 
 
 (******************************************************************************)

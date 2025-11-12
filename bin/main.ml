@@ -20,8 +20,14 @@ match Array.length(Sys.argv) with
   1 -> (match read_line() with
       Some s when s<>"" -> s |> parse_cmd |> string_of_cmd |> print_string
     | _ -> print_newline())
+(* trace cms / read cmd and n_steps from stdin *)
+| 2 -> (match read_line() with
+    | Some s when s<>"" -> s |> parse_cmd 
+      |> fun c -> trace_cmd (int_of_string Sys.argv.(1)) c "0xCAFE"
+      |> string_of_trace |> print_string
+    | _ -> print_newline())
 (* trace1 / read input from file *) 
-| 2 -> (match read_file Sys.argv.(1) with
+| 3 -> (match read_file Sys.argv.(1) with
       "" -> print_newline()
     | s -> s |> parse_contract |> string_of_contract |> print_string)
 (* wrong usage *)      

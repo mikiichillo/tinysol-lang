@@ -39,21 +39,32 @@ and string_of_cmd = function
   | Req(e) -> "require " ^ string_of_expr e
   | Call(f,e) -> f ^ "(" ^ string_of_expr e ^ ")"
   | CallExec(c) -> "exec{" ^ string_of_cmd c ^ "}"
-  | Decl(dl,c) -> "{" 
-    ^ List.fold_left (fun s d -> s ^ (if s<>"" then "; " else "") ^ string_of_decl d) "" dl ^ ";" 
+  | Block(vdl,c) -> "{" 
+    ^ List.fold_left (fun s d -> s ^ (if s<>"" then "; " else "") ^ string_of_var_decl d) "" vdl ^ ";" 
     ^ string_of_cmd c 
     ^ "}"
-
-and string_of_decl = function
+  | ExecBlock(c) -> "{" 
+    ^ string_of_cmd c 
+    ^ "}"
+and string_of_var_decl = function
   | IntVar(x) -> "int " ^ x
   | BoolVar(x) -> "bool " ^ x
   | AddrVar(x) -> "address " ^ x
+
+and string_of_fun_decl = function
   | Constr(f,a,c) -> "constructor " ^ f ^ "(" ^ (string_of_args a) ^ ") {" ^ string_of_cmd c ^ "}"                 
   | Proc(f,a,c) -> "fun " ^ f ^ "(" ^ (string_of_args a) ^ ") {" ^ string_of_cmd c ^ "}"
 
-let string_of_decls = List.fold_left (fun s d -> s ^ (if s<>"" then "; " else "") ^ string_of_decl d) ""
+let string_of_var_decls = List.fold_left (fun s d -> s ^ (if s<>"" then "; " else "") ^ string_of_var_decl d) ""
 
-let string_of_contract (Contract(c,d)) = "contract " ^ c ^ " { " ^ (string_of_decls d) ^ " }"
+let string_of_fun_decls = List.fold_left (fun s d -> s ^ (if s<>"" then "; " else "") ^ string_of_fun_decl d) ""
+
+let string_of_contract (Contract(c,vdl,fdl)) = 
+  "contract " ^ c ^ 
+  " { " ^ 
+  (string_of_var_decls vdl) ^ 
+  (string_of_fun_decls fdl) ^ 
+  " }"
 
 (*
 let string_of_env1 s x = match topenv s x with
@@ -61,32 +72,38 @@ let string_of_env1 s x = match topenv s x with
   | IProc(a,c) -> "fun(" ^ string_of_args a ^ "){" ^ string_of_cmd c ^ "}/" ^ x
 *)
 
-let string_of_env1 _ _ = "NOT IMPLEMENTED"
+let string_of_env e vl = 
+  let rec helper e vl = match vl with 
+  | [] -> ""
+  | x::vl' -> try (x ^ "->" ^
+    match e x with 
+      | Bool b -> string_of_bool b
+      | Int  n -> string_of_int n
+      | Addr a -> a
+    )
+    with _ -> helper e vl' 
+  in "{" ^ helper e vl ^ "}"
 
-let rec string_of_env s = function
+let string_of_envstack el vl = 
+  let rec helper el vl = match el with
     [] -> ""
-  | [x] -> (try string_of_env1 s x with _ -> "")
-  | x::dom' -> (try string_of_env1 s x ^ "," ^ string_of_env s dom'
-                with _ -> string_of_env s dom')
+  | [e] -> (string_of_env e vl)
+  | e::el' -> (string_of_env e vl) ^ ";" ^ (helper el' vl)
+in "[" ^ (helper el vl) ^ "]" 
 
 let rec range a b = if b<a then [] else a::(range (a+1) b);;
 
-(*
-let string_of_mem (m,l) =
-  List.fold_left (fun str i -> str ^ (try string_of_mem1 (m,l) i ^ "," with _ -> "")) "" (range 0 (l - 1))
+let string_of_storage _ =
+  "[" ^ "??" ^ "]"
 
-let rec getlocs e = function
-    [] -> []
-  | x::dom -> try (match e x with
-    | IVar l -> l::(getlocs e dom)
-    | IProc(_,_) -> [])
-    with _ -> getlocs e dom
-*)
+(* TODO: add storage variables *)
 
-let string_of_state st dom =
-  "[" ^ string_of_env st dom ^ "], "
-  (*  "[" ^ string_of_mem (getmem st,getloc st) ^ "]" ^ ", " ^ *)
-  (* string_of_int (getloc st) *)
+let string_of_sysstate (st : sysstate) (evl : ide list) =
+  "storage=" ^ 
+  string_of_storage (get_storage st) ^ 
+  ";" ^
+  "envstack=" ^
+  string_of_envstack (get_envstack st) evl
 
 let rec union l1 l2 = match l1 with
     [] -> l2
@@ -119,16 +136,22 @@ and vars_of_cmd = function
   | Req(e) -> vars_of_expr e                    
   | Call(f,e) -> union [f] (vars_of_expr e)
   | CallExec(c) -> vars_of_cmd c
-  | Decl(_,c) -> vars_of_cmd c
+  | Block(_,c) -> vars_of_cmd c
+  | ExecBlock(c) -> vars_of_cmd c
 
-let string_of_conf vars = function
-    St st -> string_of_state st vars
-  | Cmd(c,st,a) -> "<" ^ string_of_cmd c ^ ", " ^ string_of_state st vars ^ " , " ^ a ^ ">"
+let string_of_execstate evl = function
+  | St st -> string_of_sysstate st evl
+  | Cmd (c,st,a) -> "Cmd " ^ (string_of_cmd c) ^ "," ^ (string_of_sysstate st evl) ^ "," ^ a 
 
-let rec string_of_trace vars = function
+let string_of_trace stl = match stl with
+  [] -> ""
+| St _::_ -> ""
+| Cmd (c,_,_)::_ -> let evl = vars_of_cmd c in  
+  let rec helper stl = (match stl with
     [] -> ""
-  | [x] -> (string_of_conf vars x)
-  | x::l -> (string_of_conf vars x) ^ "\n -> " ^ string_of_trace vars l
+  | [st] -> (string_of_execstate evl st)
+  | st::l -> (string_of_execstate evl st) ^ "\n -> " ^ helper l)
+in helper stl
 
 let rec last = function
     [] -> failwith "last on empty list"

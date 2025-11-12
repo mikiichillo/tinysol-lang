@@ -17,7 +17,7 @@ let read_line () =
 
 match Array.length(Sys.argv) with
 (* trace n / read input from stdin *) 
-  1 -> (match read_line() with
+  2 when Sys.argv.(1)="parse_cmd" -> (match read_line() with
       Some s when s<>"" -> s |> parse_cmd |> string_of_cmd |> print_string
     | _ -> print_newline())
 (* trace cms / read cmd and n_steps from stdin *)
@@ -27,8 +27,8 @@ match Array.length(Sys.argv) with
       |> string_of_trace |> print_string
     | _ -> print_newline())
 (* trace1 / read input from file *) 
-| 3 -> (match read_file Sys.argv.(1) with
+| 3 when Sys.argv.(1)="parse_contract" -> (match read_file Sys.argv.(2) with
       "" -> print_newline()
     | s -> s |> parse_contract |> string_of_contract |> print_string)
 (* wrong usage *)      
-| _ -> failwith "Usage: dune exec tinysol-lang n_steps [file]"
+| _ -> failwith "Usage: dune exec tinysol [args]"

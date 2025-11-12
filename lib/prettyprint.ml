@@ -62,7 +62,7 @@ let string_of_fun_decls = List.fold_left (fun s d -> s ^ (if s<>"" then "; " els
 let string_of_contract (Contract(c,vdl,fdl)) = 
   "contract " ^ c ^ 
   " { " ^ 
-  (string_of_var_decls vdl) ^ 
+  (let s = string_of_var_decls vdl in if s="" then "" else s ^ "; ") ^ 
   (string_of_fun_decls fdl) ^ 
   " }"
 

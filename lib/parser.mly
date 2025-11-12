@@ -106,6 +106,7 @@ var_decl:
 ;
 
 fun_decl:
+  | FUN { Proc("zzz", [], Skip) } 
   | CONSTR; f = ID; LPAREN; a = args; RPAREN; LBRACE; c = cmd; RBRACE { Constr(f,a,c) }
   | FUN; f = ID; LPAREN; a = args; RPAREN; LBRACE; c = cmd; RBRACE { Proc(f,a,c) }
 ;

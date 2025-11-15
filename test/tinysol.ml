@@ -15,7 +15,7 @@ let test_parse_cmd (cmd,t) =
 let test_trace_cmd (cmd,n_steps,var,exp_val) =
   cmd
   |> parse_cmd
-  |> fun c -> last (trace_cmd n_steps c "0xCAFE")
+  |> fun c -> last (trace_cmd n_steps c "0xCAFE" init_sysstate)
   |> fun t -> match t with
   | St st -> lookup st "0xCAFE" var = exp_val
   | Cmd(_,st,_) -> lookup st "0xCAFE" var = exp_val

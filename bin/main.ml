@@ -21,18 +21,25 @@ match Array.length(Sys.argv) with
       Some s when s<>"" -> s |> parse_cmd |> string_of_cmd |> print_string
     | _ -> print_newline())
 (* trace cms / read cmd and n_steps from stdin *)
-| 2 -> (match read_line() with
+| 3 when Sys.argv.(1)="exec_cmd" -> (match read_line() with
     | Some s when s<>"" -> s |> parse_cmd 
-      |> fun c -> trace_cmd (int_of_string Sys.argv.(1)) c "0xCAFE"
+      |> fun c -> trace_cmd (int_of_string Sys.argv.(2)) c "0xCAFE" init_sysstate
       |> string_of_trace |> print_string
     | _ -> print_newline())
 (* trace1 / read input from file *) 
 | 3 when Sys.argv.(1)="parse_contract" -> (match read_file Sys.argv.(2) with
       "" -> print_newline()
     | s -> s |> parse_contract |> string_of_contract |> print_string)
+| 3 when Sys.argv.(1)="exec_tx" -> (match read_file Sys.argv.(2) with
+      "" -> print_newline()
+    | src -> src |> parse_contract
+      |> deploy_contract init_sysstate "0xAA" 
+      |> faucet "0x0" 100
+      |> exec_tx 10 (Tx("0x0","0xAA","g", []))
+      |> string_of_trace |> print_string)
 (* wrong usage *)      
 | _ -> print_string "Usage:
   dune exec tinysol parse_cmd   : parses cmd in stdin
-  dune exec tinysol <n_steps>   : executes n_steps of cmd in stdin
+  dune exec tinysol exec_cmd <n_steps>   : executes n_steps of cmd in stdin
   dune exec tinysol parse_contract <filename>   : parses contract in file
 "

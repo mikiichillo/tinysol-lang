@@ -14,14 +14,14 @@ type envval  = IVar of exprval | IProc of args * cmd
 type env = ide -> exprval
 
 (* contract state: persistent contract storage, preserved between calls *)
-type contract_state = {
+type account_state = {
   balance : int;
   storage : ide -> exprval;
+  code : contract option;
 }
 
 type sysstate = {
-  users: addr -> int;                 (* EOA state = ETH balance *)
-  contracts: addr -> contract_state;  (* Contract state = ETH balance * storage *)
+  accounts: addr -> account_state;
   stackenv: env list;
 }
 
@@ -29,17 +29,6 @@ type sysstate = {
 type exec_state = 
   | St of sysstate 
   | Cmd of cmd * sysstate * addr
-
-(* the state of an address depends on the type of address:
-    EOA:      amount of ETH held by the address
-    Contract: amount of ETH plus mapping from state variables to values
- *)
-type addrinfo = 
-  | EOA 
-  | Contr of contract
-
-(* global environment *)
-type genv = addr -> addrinfo 
 
 
 (* Functions to access and manipulate the state *)
@@ -53,7 +42,6 @@ let popenv (st: sysstate) : env list = match st.stackenv with
   | _::el -> el
 
 let botenv = fun x -> failwith ("variable " ^ x ^ " unbound")
-let botstorage = fun a -> failwith ("address " ^ a ^ " unbound")
     
 let bind f x v = fun y -> if y=x then v else f y
 
@@ -66,10 +54,14 @@ let lookup (st : sysstate) (a : addr) (x : ide) : exprval =
     e x
   with _ -> 
     (* look up for x in storage of a *)
-    let cs = st.contracts a in
+    let cs = st.accounts a in
     cs.storage x
 
-let mem_contract_state (cs : contract_state) (x : ide) : bool = 
+let exists_account (st : sysstate) (a : addr) : bool =
+  try let _ = st.accounts a in true
+  with _ -> false
+
+let mem_contract_state (cs : account_state) (x : ide) : bool = 
   try let _ = cs.storage x in true
   with _ -> false
 
@@ -78,10 +70,10 @@ let mem_env (r:env) (x:ide) : bool =
   with _ -> false
 
 let update_storage (st : sysstate) (a:addr) (x:ide) (v:exprval) : sysstate = 
-  let cs = st.contracts a in
+  let cs = st.accounts a in
     if mem_contract_state cs x then 
       let cs' = { cs with storage = bind cs.storage x v } in 
-      { st with contracts = bind st.contracts a cs' }
+      { st with accounts = bind st.accounts a cs' }
     else failwith (x ^ " not bound in storage of " ^ a)   
 
 let update_env (st : sysstate) (x:ide) (v:exprval) : sysstate =

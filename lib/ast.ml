@@ -58,7 +58,6 @@ and modifier =
   | Private
 
 and fun_decl =
-  | Constr of ide * args * cmd
   | Proc of ide * args * cmd * modifier
 
 and var_decls = var_decl list

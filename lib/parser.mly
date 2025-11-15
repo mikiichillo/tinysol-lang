@@ -129,7 +129,7 @@ modifier:
 ;
 
 fun_decl:
-  | CONSTR; f = ID; LPAREN; a = args; RPAREN; LBRACE; c = cmd; RBRACE { Constr(f,a,c) }
+  | CONSTR; LPAREN; a = args; RPAREN; LBRACE; c = cmd; RBRACE { Proc("constructor",a,c,Public) }
   | FUN; f = ID; LPAREN; a = args; RPAREN; m=modifier; LBRACE; c = cmd; RBRACE { Proc(f,a,c,m) }
   | FUN; f = ID; LPAREN; a = args; RPAREN; m=modifier; LBRACE; RBRACE { Proc(f,a,Skip,m) }
 ;

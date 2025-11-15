@@ -56,9 +56,11 @@ and string_of_var_decl = function
   | BoolVar(x) -> "bool " ^ x
   | AddrVar(x) -> "address " ^ x
 
-and string_of_fun_decl = function
-  | Constr(f,a,c) -> "constructor " ^ f ^ "(" ^ (string_of_args a) ^ ") {" ^ string_of_cmd c ^ "}\n"                 
-  | Proc(f,a,c,m) -> "function " ^ f ^ "(" ^ (string_of_args a) ^ ") " ^
+and string_of_fun_decl = function Proc(f,a,c,m) -> 
+    if f="constructor" then
+      "constructor " ^ f ^ "(" ^ (string_of_args a) ^ ") {" ^ string_of_cmd c ^ "}\n"
+    else
+    "function " ^ f ^ "(" ^ (string_of_args a) ^ ") " ^
     string_of_modifier m ^ " " ^ 
     "{" ^ string_of_cmd c ^ "}\n"
 
@@ -107,7 +109,7 @@ let string_of_storage _ =
 
 let string_of_sysstate (st : sysstate) (evl : ide list) =
   "storage=" ^ 
-  string_of_storage st.contracts ^ 
+  string_of_storage st.accounts ^ 
   ";" ^
   "envstack=" ^
   string_of_envstack st.stackenv evl

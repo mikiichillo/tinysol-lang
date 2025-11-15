@@ -158,26 +158,53 @@ let rec trace_rec_cmd n t =
     with NoRuleApplies -> [t]
 
 
-let init_storage = { balance=0; storage=botenv }
+(* let init_storage = { balance=0; storage=botenv; code = None } *)
 
 let init_sysstate = { 
-    users = (fun _ -> 0);
-    contracts = (fun _ -> init_storage); 
+    accounts = (fun a -> failwith ("account " ^ a ^ " unbound")); 
     stackenv = [botenv] 
 }
 
-let trace_cmd n_steps (c:cmd) (a:addr) =
-  trace_rec_cmd n_steps (Cmd(c,init_sysstate,a))
+let trace_cmd n_steps (c:cmd) (a:addr) (st : sysstate)=
+  trace_rec_cmd n_steps (Cmd(c,st,a))
 
 
 (******************************************************************************)
 (*                       Small-step semantics of transactions                 *)
 (******************************************************************************)
 
-(*
-let trace1_tx (tx: transaction) (st : sysstate) = 
-  Tx(a,c,f,args)
-*)
+let faucet (a : addr) (n : int) (st : sysstate) : sysstate = 
+  if exists_account st a then 
+    let as' = { (st.accounts a) with balance = n + (st.accounts a).balance } in
+    { st with accounts = bind st.accounts a as' }
+  else
+    let as' = { balance = n; storage = botenv; code = None; } in
+    { st with accounts = bind st.accounts a as' }
+
+let find_fun (Contract(_,_,fdl)) (f : ide) : fun_decl option =
+  List.fold_left 
+  (fun acc (Proc(g,al,c,m)) -> if acc <> None || g<>f then acc else Some (Proc(g,al,c,m)))
+  None
+  fdl
+
+(* TODO: we should execute constructor!! *)
+
+let deploy_contract (st : sysstate) (a : addr) (c : contract) : sysstate =
+  if exists_account st a then failwith ("deploy_contract: address " ^ a ^ " already bound in sysstate")
+  else
+    let as' = bind st.accounts a ({ balance=0; storage=botenv; code = Some c }) in
+  { st with accounts = as' }
+
+let exec_tx (n_steps : int) (Tx(a,b,f,_)) (st : sysstate) =
+  if not (exists_account st a) then failwith ("sender address " ^ a ^ " does not exist") else
+  if not (exists_account st b) then failwith ("to address " ^ b ^ " does not exist") else
+  let b_state = st.accounts b in match b_state.code with
+  | None -> failwith "Call not to a contract"
+  | Some src -> (match find_fun src f with
+      | None -> failwith ("Contract at address " ^ b ^ " has no function named " ^ f)
+      | Some (Proc(_,_,c,_)) ->  
+          trace_cmd n_steps c b st)
+
 
 (*
 let trace_tx (n_steps : int) (tx: transaction) (st : sysstate) = 

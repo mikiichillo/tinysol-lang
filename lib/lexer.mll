@@ -40,7 +40,9 @@ rule read_token =
   | ">" { GE }
   | "?" { RECEIVESEP }
   | "." { FIELDSEP }
+  | "this" { THIS }
   | "msg.sender" { MSGSENDER }
+  | "balance" { BALANCE }
   | "transfer" { TRANSFER }
   | ":" { TOKSEP }
   | "contract" { CONTRACT }

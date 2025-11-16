@@ -19,9 +19,11 @@ type exprval =
 type expr =
   | True
   | False
-  | Var of ide
   | IntConst of int
   | AddrConst of addr
+  | This
+  | Var of ide
+  | BalanceOf of expr
   | Not of expr
   | And of expr * expr
   | Or of expr * expr
@@ -41,11 +43,11 @@ and cmd =
   | Skip
   | Assign of ide * expr
   | Seq of cmd * cmd
-  | Send of expr * expr       (* send(e1,e2) transfers e2 wei to e1 *)
   | If of expr * cmd * cmd
+  | Send of expr * expr       (* send(e1,e2) transfers e2 wei to e1 *)
   | Req of expr               (* require(e) reverts if e is false *) 
   | Call of ide * expr        (* TODO: add actual parameters *)
-  | CallExec of cmd           (* Runtime only: c is the cmd being reduced *)
+  | ExecCall of cmd           (* Runtime only: c is the cmd being reduced *)
   | Block of var_decls * cmd
   | ExecBlock of cmd          (* Runtime only: c is the cmd being reduced *)
 

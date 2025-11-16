@@ -42,7 +42,9 @@ open Ast
 %token ADDR
 %token RECEIVESEP
 %token FIELDSEP
+%token THIS
 %token MSGSENDER
+%token BALANCE
 %token TRANSFER
 %token TOKSEP
 %token ARGSEP
@@ -93,7 +95,9 @@ value:
 expr:
   | n = CONST { IntConst(int_of_string n) }
   | s = STRING { AddrConst(s) }
+  | THIS { This }
   | MSGSENDER { Var("msg.sender") }
+  | e=expr; FIELDSEP; BALANCE { BalanceOf(e) }
   | TRUE { True }
   | FALSE { False }
   | NOT; e=expr { Not e }

@@ -32,9 +32,11 @@ let rec union l1 l2 = match l1 with
 let rec vars_of_expr = function
     True
   | False
-  | IntConst _ -> []
-  | AddrConst _ -> []               
+  | IntConst _
+  | AddrConst _
+  | This -> []               
   | Var x -> [x]
+  | BalanceOf e
   | Not e -> vars_of_expr e
   | And(e1,e2) 
   | Or(e1,e2) 
@@ -56,7 +58,7 @@ and vars_of_cmd = function
   | Send(e1,e2) -> union (vars_of_expr e1) (vars_of_expr e2)
   | Req(e) -> vars_of_expr e                    
   | Call(f,e) -> union [f] (vars_of_expr e)
-  | CallExec(c) -> vars_of_cmd c
+  | ExecCall(c) -> vars_of_cmd c
   | Block(_,c) -> vars_of_cmd c
   | ExecBlock(c) -> vars_of_cmd c
 
@@ -83,9 +85,11 @@ let string_of_args = List.fold_left (fun s a -> s ^ (if s<>"" then "," else "") 
 let rec string_of_expr = function
     True -> "true"
   | False -> "false"
-  | Var x -> x
   | IntConst n -> string_of_int n
   | AddrConst a -> "\"" ^ a ^ "\""
+  | This -> "this"
+  | Var x -> x
+  | BalanceOf e -> string_of_expr e ^ ".balance"
   | Not e -> "!" ^ string_of_expr e
   | And(e1,e2) -> string_of_expr e1 ^ " && " ^ string_of_expr e2
   | Or(e1,e2) -> string_of_expr e1 ^ " || " ^ string_of_expr e2
@@ -107,7 +111,7 @@ and string_of_cmd = function
   | Send(e1,e2) -> string_of_expr e1 ^ ".transfer(" ^ (string_of_expr e2) ^ ");"
   | Req(e) -> "require " ^ string_of_expr e ^ ";"
   | Call(f,e) -> f ^ "(" ^ string_of_expr e ^ ")"
-  | CallExec(c) -> "exec{" ^ string_of_cmd c ^ "}"
+  | ExecCall(c) -> "exec{" ^ string_of_cmd c ^ "}"
   | Block(vdl,c) -> "{" 
     ^ List.fold_left (fun s d -> s ^ (if s<>"" then "; " else "") ^ string_of_var_decl d) "" vdl ^ ";" 
     ^ string_of_cmd c 

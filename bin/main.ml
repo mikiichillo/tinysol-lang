@@ -44,7 +44,9 @@ match Array.length(Sys.argv) with
       |> print_sysstate_id 
       |> exec_tx 1000 (Tx("0x0","0xAA","f2", [Addr "0x0"]))
       |> print_sysstate_id 
-      |> exec_tx 1000 (Tx("0x0","0xAA","f3", []))
+      |> exec_tx 1000 (Tx("0x0","0xAA","f3", [Int 3]))
+      |> print_sysstate_id 
+      |> exec_tx 1000 (Tx("0x0","0xAA","f3", [Int 3]))
       |> print_sysstate_id 
       |> fun _ -> ())
 (* wrong usage *)      

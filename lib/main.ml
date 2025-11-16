@@ -34,9 +34,14 @@ let addr_of_exprval v = match v with
 let rec eval_expr (st : sysstate) (a : addr) = function
     True -> Bool true
   | False -> Bool false
-  | Var x -> lookup a x st
   | IntConst n -> Int n
   | AddrConst s -> Addr s
+  | This -> Addr a
+  | Var x -> lookup a x st
+  | BalanceOf e ->
+    let b = addr_of_exprval (eval_expr st a e) in (
+      try (Int (st.accounts b).balance)
+      with _ -> Int 0)
   | Not(e) -> (match eval_expr st a e with
         Bool b -> Bool(not b)
       | _ -> raise (TypeError "Not")
@@ -119,7 +124,6 @@ let rec trace1_cmd = function
           Bool true -> Cmd(c1,st,a)
         | Bool false -> Cmd(c2,st,a)
         | _ -> failwith("if: type error"))
-    | Req(_) -> failwith ("TODO")
     | Send(ercv,eamt) -> 
         let rcv = addr_of_exprval (eval_expr st a ercv) in 
         let amt = int_of_exprval (eval_expr st a eamt) in
@@ -132,16 +136,17 @@ let rec trace1_cmd = function
         else
           let rcv_state = { balance = amt; storage = botenv; code = None; } in
           St { st with accounts = st.accounts |> bind rcv rcv_state |> bind a sender_state; active = rcv::st.active }
+    | Req(_) -> failwith ("TODO")
     | Call(_,_) -> failwith "TODO"
+    | ExecCall _  -> failwith "TODO"
     | Block(vdl,c) ->
-      let e = topenv st in
-      let e' = eval_var_decls vdl e in
-      Cmd(ExecBlock c, { st with stackenv = e'::st.stackenv} , a)
+        let e = topenv st in
+        let e' = eval_var_decls vdl e in
+        Cmd(ExecBlock c, { st with stackenv = e'::st.stackenv} , a)
     | ExecBlock(c) -> (match trace1_cmd (Cmd(c,st,a)) with
         | St st -> St (popenv st)
         | Cmd(c1',st1,a') -> Cmd(ExecBlock(c1'),st1,a'))
-    | _ -> failwith "TODO")
-
+    )
 (* (match (topenv st f,eval_expr st e) with
           (IProc(a,c),Int n) ->
           let l = getloc st in

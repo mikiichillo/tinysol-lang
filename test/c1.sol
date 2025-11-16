@@ -11,8 +11,9 @@ contract C1 {
         a.transfer(1);
     }
 
-    function f3() public {
-        msg.sender.transfer(1);
+    function f3(int amt) public {
+        if (this.balance < 8) b=false;
+        else msg.sender.transfer(amt);
     }
 
 }

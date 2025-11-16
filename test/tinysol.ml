@@ -93,7 +93,11 @@ let%test "test_trace_cmd_12" = test_trace_cmd
 
 
 (********************************************************************************
- test_exec_tx : (contract, transaction list, n_steps, variable, expected value after n_steps)
+ test_exec_tx : 
+ - c: the contract that will be deployed for testing,
+ - txl: a list of transactions that will be executed
+ - vars: a list of state variables of contract c that will be inspected
+ - exp_vals: a list of expected values for the variables vars)
  ********************************************************************************)
 
 let test_exec_tx (c: string) (txl: string list) (vars : ide list) (exp_vals : exprval list) =

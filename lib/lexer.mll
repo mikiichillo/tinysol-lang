@@ -43,7 +43,8 @@ rule read_token =
   | "msg.sender" { MSGSENDER }
   | "balance" { BALANCE }
   | "transfer" { TRANSFER }
-  | ":" { TOKSEP }
+  | ":" { COLON }
+  | "value" { VALUE }
   | "contract" { CONTRACT }
   | "skip" { SKIP }
   | "="  { TAKES }

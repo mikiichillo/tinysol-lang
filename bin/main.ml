@@ -30,17 +30,11 @@ match Array.length(Sys.argv) with
       |> fun c -> deploy_contract "0xAA" c init_sysstate 
       |> faucet "0x0" 100
       |> faucet "0xAA" 10
-      |> exec_tx 1000 (Tx("0x0","0xAA","f1", []))
+      |> exec_tx 1000 (parse_transaction "0x0:0xAA.f1()")
       |> print_sysstate_id
-      |> exec_tx 1000 (Tx("0x0","0xAA","f1", []))
+      |> exec_tx 1000 (parse_transaction "0x0:0xAA.f1()")
       |> print_sysstate_id
-      |> exec_tx 1000 (Tx("0x0","0xAA","f1", []))
-      |> print_sysstate_id 
-      |> exec_tx 1000 (Tx("0x0","0xAA","f2", [Addr "0x0"]))
-      |> print_sysstate_id 
-      |> exec_tx 1000 (Tx("0x0","0xAA","f3", [Int 3]))
-      |> print_sysstate_id 
-      |> exec_tx 1000 (Tx("0x0","0xAA","f3", [Int 3]))
+      |> exec_tx 1000 (parse_transaction "0x0:0xAA.f1()")
       |> print_sysstate_id 
       |> fun _ -> ())
 (* wrong usage *)      

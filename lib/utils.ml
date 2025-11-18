@@ -240,8 +240,10 @@ let string_of_trace stl = match stl with
   | st::l -> (string_of_execstate evl st) ^ "\n--->\n" ^ helper l)
 in helper stl
 
-let string_of_transaction (Tx(sender,rcv,f,al)) =
-  sender ^ ":" ^ rcv ^ "." ^ f ^ string_of_args al
+let string_of_transaction tx =
+  tx.txsender ^ ":" ^ tx.txto ^ "." ^ tx.txfun ^
+  "{value: " ^ (string_of_int tx.txvalue) ^ "}" ^ 
+  "(" ^ string_of_args tx.txargs ^ ")" 
 
 
 (******************************************************************************)

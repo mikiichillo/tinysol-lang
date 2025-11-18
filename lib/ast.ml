@@ -67,7 +67,15 @@ and fun_decls = fun_decl list
 type contract = Contract of ide * var_decls * fun_decls
 
 (* tx = sender:contract.function(args) *)
-type transaction = Tx of addr * addr * ide * (exprval list)
+(* type transaction = Tx of addr * addr * ide * (exprval list) *)
+
+type transaction = {
+  txsender : addr;
+  txto : addr;
+  txfun : ide;
+  txargs : exprval list;
+  txvalue : int;
+}
 
 (******************************************************************************)
 (*                                    Tinysol CLI                             *)

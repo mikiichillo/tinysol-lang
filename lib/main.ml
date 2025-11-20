@@ -67,10 +67,14 @@ let rec eval_expr (st : sysstate) (a : addr) = function
     )        
   | Eq(e1,e2) -> (match (eval_expr st a e1,eval_expr st a e2)  with
         (Int n1,Int n2) -> Bool(n1 = n2)
+      | (Bool b1,Bool b2) -> Bool(b1 = b2)
+      | (Addr a1,Addr a2) -> Bool(a1 = a2)
       | _ -> raise (TypeError "Eq")
     )    
   | Neq(e1,e2) -> (match (eval_expr st a e1,eval_expr st a e2)  with
         (Int n1,Int n2) -> Bool(n1 <> n2)
+      | (Bool b1,Bool b2) -> Bool(b1 <> b2)
+      | (Addr a1,Addr a2) -> Bool(a1 <> a2)
       | _ -> raise (TypeError "Eq")
     )    
   | Leq(e1,e2) -> (match (eval_expr st a e1,eval_expr st a e2)  with

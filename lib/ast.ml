@@ -91,4 +91,4 @@ type cli_cmd =
   | Deploy of transaction * string
   | CallFun of transaction
   | Revert of transaction
-  | Assert of addr * ide * exprval
+  | Assert of addr * expr

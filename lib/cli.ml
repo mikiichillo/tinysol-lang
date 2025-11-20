@@ -12,7 +12,7 @@ let string_of_cli_cmd = function
   | Deploy(tx,filename) -> "deploy " ^ string_of_transaction tx ^ " " ^ filename
   | CallFun tx -> string_of_transaction tx
   | Revert tx -> "revert " ^ string_of_transaction tx
-  | Assert(a,x,ev) -> "assert " ^ a ^ " " ^ x ^ " = " ^ string_of_exprval ev 
+  | Assert(a,e) -> "assert " ^ a ^ " " ^ string_of_expr e 
 
 let is_empty_or_comment (s : string) =
   let len = String.length s in
@@ -39,13 +39,9 @@ let exec_cli_cmd (cc : cli_cmd) (st : sysstate) : sysstate = match cc with
       st |> exec_tx 1000 tx 
       |> fun _ -> failwith ("test failed: transaction " ^ string_of_transaction tx ^ " should revert") 
     with _ -> st)
-  | Assert(a,x,ev) ->
-      let v = 
-        if x="balance" then Int(lookup_balance a st) 
-        else lookup_var a x st
-      in 
-      if v = ev then st
-      else failwith ("assertion violation: " ^ string_of_cli_cmd cc) 
+  | Assert(a,e) -> (match  eval_expr st a e with
+    | Bool true -> st
+    | _ -> failwith ("assertion violation: " ^ string_of_cli_cmd cc)) 
 
 let exec_cli_cmd_list (verbose : bool) (ccl : cli_cmd list) (st : sysstate) = 
   List.fold_left 

@@ -77,10 +77,12 @@ open Ast
 %type <var_decls> formal_args
 %type <expr> expr 
 
-%start <cmd> cmd_test
+%start <cmd> cmd_eof
+%start <expr> expr_eof
 
 %start <transaction> transaction
 %start <cli_cmd> cli_cmd
+
 
 %%
 
@@ -123,12 +125,17 @@ expr:
   | LPAREN; e = expr; RPAREN { e }
 ;
 
+expr_eof:
+  | e = expr; EOF { e }
+;
+
 nonseq_cmd:
   | SKIP; CMDSEP;  { Skip }
   | REQ; e = expr; CMDSEP; { Req(e) } 
   | x = ID; TAKES; e = expr; CMDSEP; { Assign(x,e) }
   | rcv=expr; FIELDSEP; TRANSFER; LPAREN; amt=expr; RPAREN; CMDSEP; { Send(rcv,amt) }
   | f = ID; LPAREN; el = separated_list(ARGSEP, expr) RPAREN; CMDSEP; { Call(f,el) }
+;
 
 cmd:
   | c = nonseq_cmd { c }
@@ -140,6 +147,10 @@ cmd:
   | IF LPAREN; e = expr; RPAREN; c1 = nonseq_cmd { If(e,c1,Skip) }
   | LBRACE; c = cmd; RBRACE { c }
   | LBRACE; vdl = list(var_decl) c = cmd; RBRACE { Block(vdl, c) }
+;
+
+cmd_eof:
+  | c = cmd; EOF { c }
 ;
 
 var_decl:
@@ -163,10 +174,6 @@ fun_decl:
   | CONSTR; LPAREN; al = formal_args; RPAREN; p = payable; LBRACE; c = cmd; RBRACE { Constr(al,c,p) }
   | FUN; f = ID; LPAREN; al = formal_args; RPAREN; v=visibility; p = payable; LBRACE; c = cmd; RBRACE { Proc(f,al,c,v,p) }
   | FUN; f = ID; LPAREN; al = formal_args; RPAREN; v=visibility; p = payable; LBRACE; RBRACE { Proc(f,al,Skip,v,p) }
-;
-
-cmd_test:
-  | c = cmd; EOF { c }
 ;
 
 formal_args:
@@ -215,6 +222,5 @@ cli_cmd:
   | REVERT; tx = transaction { Revert tx }
   | FAUCET; a = ADDRLIT; n = CONST { Faucet(a, int_of_string n) }
   | DEPLOY; tx = transaction; filename = STRING { Deploy(tx,filename) }
-  | ASSERT; a = ADDRLIT; x = ID;  ev = value { Assert(a,x,ev) }
-  | ASSERT; a = ADDRLIT; BALANCE; ev = CONST { Assert(a,"balance",Int (int_of_string ev)) }
+  | ASSERT; a = ADDRLIT; e = expr_eof; { Assert(a,e) }
 ;

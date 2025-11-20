@@ -34,9 +34,14 @@ let read_lines filename =
 (*                                   Parsing utilities                        *)
 (******************************************************************************)
 
+let parse_expr (s : string) : expr =
+  let lexbuf = Lexing.from_string s in
+  let ast = Parser.expr_eof Lexer.read_token lexbuf in
+  ast
+
 let parse_cmd (s : string) : cmd =
   let lexbuf = Lexing.from_string s in
-  let ast = Parser.cmd_test Lexer.read_token lexbuf in
+  let ast = Parser.cmd_eof Lexer.read_token lexbuf in
   ast
 
 let parse_contract (s : string) : contract =

@@ -31,6 +31,7 @@ type expr =
   | IntCast of expr
   | UintCast of expr
   | AddrCast of expr
+  | PayableCast of expr
 
 (* commands *)
           
@@ -47,7 +48,11 @@ and cmd =
   | Block of var_decls * cmd
   | ExecBlock of cmd          (* Runtime only: c is the cmd being reduced *)
 
-and base_type = IntBT | UintBT | BoolBT | AddrBT
+and base_type = 
+  | IntBT           (* int *)
+  | UintBT          (* uint *) 
+  | BoolBT          (* bool *)
+  | AddrBT of bool  (* address (the bool b in AddrBT(b) tells whether payable (b=1) or not (b=0) *)
 
 (* a variable type can be either:
   - a base type with a bool i telling whether the variable is mutable (i=false) or immutable (i=true)

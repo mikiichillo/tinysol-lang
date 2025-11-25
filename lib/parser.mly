@@ -137,6 +137,7 @@ expr:
   | INT; LPAREN; e=expr; RPAREN; { IntCast(e) }
   | UINT; LPAREN; e=expr; RPAREN; { UintCast(e) }
   | ADDR; LPAREN; e=expr; RPAREN; { AddrCast(e) }
+  | PAYABLE; LPAREN; e=expr; RPAREN; { PayableCast(e) }
   | x = ID { Var(x) }
   | LPAREN; e = expr; RPAREN { e }
 ;
@@ -178,7 +179,7 @@ base_type:
   | INT  { IntBT  }
   | UINT { UintBT }
   | BOOL { BoolBT }
-  | ADDR; opt_payable { AddrBT }
+  | ADDR; p = opt_payable { AddrBT(p) }
 
 opt_id:
   | ID { }
@@ -220,7 +221,7 @@ formal_arg:
   | INT;  x = ID { VarT(IntBT,false),x }
   | UINT; x = ID { VarT(UintBT,false),x }
   | BOOL; x = ID { VarT(BoolBT,false),x }
-  | ADDR; opt_payable; x = ID { VarT(AddrBT,false),x } (* TODO: handle payable *)
+  | ADDR; p = opt_payable; x = ID { VarT(AddrBT(p),false),x }
 ;
 
 transaction:

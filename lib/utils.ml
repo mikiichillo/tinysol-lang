@@ -79,7 +79,8 @@ let rec vars_of_expr = function
   | Not e
   | IntCast e
   | UintCast e
-  | AddrCast e ->  vars_of_expr e
+  | AddrCast e
+  | PayableCast e ->  vars_of_expr e
   | MapR(e1,e2) 
   | And(e1,e2) 
   | Or(e1,e2) 
@@ -151,6 +152,7 @@ let rec string_of_expr = function
   | IntCast(e) -> "int(" ^ string_of_expr e ^ ")"
   | UintCast(e) -> "int(" ^ string_of_expr e ^ ")"
   | AddrCast(e) -> "address(" ^ string_of_expr e ^ ")"
+  | PayableCast(e) -> "payable(" ^ string_of_expr e ^ ")"
 
 and string_of_cmd = function
     Skip -> "skip;"
@@ -174,7 +176,7 @@ and string_of_base_type = function
 | IntBT  -> "int"
 | UintBT -> "uint"
 | BoolBT -> "bool"
-| AddrBT -> "address"
+| AddrBT p -> "address" ^ (if p then " payable" else "")
 
 and string_of_var_type = function
 | VarT(t,i) -> string_of_base_type t ^ (if i then " immutable" else "")

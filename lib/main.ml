@@ -109,13 +109,16 @@ let rec eval_expr (st : sysstate) (a : addr) = function
   | UintCast(e) -> (match eval_expr st a e  with
       | Int n when n>=0-> Int n
       | _ -> raise (TypeError "UintCast")
-    )          
+    )
   | AddrCast(e) -> (match eval_expr st a e  with
       | Addr a -> Addr a
       | _ -> raise (TypeError "AddrCast")
     )          
+  | PayableCast(e) -> (match eval_expr st a e  with
+      | Addr a -> Addr a (* payable cast is only implemented by the type checker *)
+      | _ -> raise (TypeError "AddrCast")
+    )          
   
-
 let eval_var_decls (vdl : var_decl list) (e : env): env =
   List.fold_left
     (fun acc vd ->
@@ -123,7 +126,7 @@ let eval_var_decls (vdl : var_decl list) (e : env): env =
         | VarT(IntBT,_),x  
         | VarT(UintBT,_),x -> acc |> bind x (Int 0)
         | VarT(BoolBT,_),x -> acc |> bind x (Bool false)
-        | VarT(AddrBT,_),x -> acc |> bind x (Addr "0")
+        | VarT(AddrBT _,_),x -> acc |> bind x (Addr "0")
         | MapT(_),_ -> failwith "mappings cannot be used in local declarations" 
     )
     e
@@ -208,7 +211,7 @@ let default_value = function
   IntBT  
 | UintBT -> Int 0
 | BoolBT -> Bool false
-| AddrBT -> Addr "0"
+| AddrBT _ -> Addr "0"
 
 let init_storage (Contract(_,vdl,_)) : ide -> exprval =
   List.fold_left (fun acc vd -> 
@@ -278,7 +281,7 @@ let bind_fargs_aargs (xl : var_decl list) (vl : exprval list) : env =
   (fun acc x_decl v -> match (x_decl,v) with 
    | ((VarT(IntBT,_),x), Int _)
    | ((VarT(BoolBT,_),x), Bool _) 
-   | ((VarT(AddrBT,_),x), Addr _) -> bind x v acc
+   | ((VarT(AddrBT _,_),x), Addr _) -> bind x v acc
    | ((VarT(UintBT,_),x), Int n) when n>=0 -> bind x v acc
    | ((MapT(_),_),_) -> failwith "Maps cannot be passed as function parameters"
    | _ -> failwith "exec_tx: type mismatch between formal and actual arguments") 
@@ -333,11 +336,11 @@ let exec_tx (n_steps : int) (tx: transaction) (st : sysstate) : sysstate =
         let xl',vl' =
           if deploy then match tx.txargs with 
             _::al -> 
-            (VarT(AddrBT,false),"msg.sender") :: xl,
+            (VarT(AddrBT false,false),"msg.sender") :: xl,
             Addr (tx.txsender) :: al
             | _ -> assert(false) (* should not happen *)
           else
-            (VarT(AddrBT,false),"msg.sender") :: (VarT(IntBT,false),"msg.value") :: xl,
+            (VarT(AddrBT false,false),"msg.sender") :: (VarT(IntBT,false),"msg.value") :: xl,
             Addr tx.txsender :: Int tx.txvalue :: tx.txargs
         in
         let e' = bind_fargs_aargs xl' vl' in

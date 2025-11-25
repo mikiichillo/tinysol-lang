@@ -10,8 +10,17 @@ type exprtype =
   | IntConstET
   | UintET
   | UintConstET
-  | AddrET
+  | AddrET of bool
   | MapET of exprtype * exprtype
+
+let rec string_of_exprtype = function
+  | BoolET      -> "bool"
+  | IntET       -> "int"
+  | IntConstET  -> "int const"
+  | UintET      -> "uint"
+  | UintConstET -> "uint const"
+  | AddrET p    -> "address" ^ (if p then " payable" else "")
+  | MapET(t1,t2) -> string_of_exprtype t1 ^ " => " ^ string_of_exprtype t2
 
 (* TypeError(expression, inferred type, expected type) *)
 exception TypeError of expr * exprtype * exprtype
@@ -23,15 +32,15 @@ let exprtype_of_decltype = function
   | IntBT  -> IntET
   | UintBT -> UintET
   | BoolBT -> BoolET
-  | AddrBT -> AddrET
+  | AddrBT(b) -> AddrET(b)
 
 let lookup_type (x : ide) (vdl : var_decl list) : exprtype option =
-  if x="msg.sender" then Some AddrET
+  if x="msg.sender" then Some (AddrET false)
   else if x="msg.value" then Some UintET else 
   vdl 
   |> List.map (fun vd -> match vd with
     | VarT(t,_),x  -> (exprtype_of_decltype t),x 
-    | MapT(tk,tv),x ->  MapET(exprtype_of_decltype tk, exprtype_of_decltype tv),x)
+    | MapT(tk,tv),x -> MapET(exprtype_of_decltype tk, exprtype_of_decltype tv),x)
   |> List.fold_left
   (fun acc (t,y) -> if acc=None && x=y then Some t else acc)
   None
@@ -68,8 +77,8 @@ let rec typecheck_expr (vdl : var_decl list) = function
   | False -> BoolET
   | IntConst n when n>=0 -> UintConstET
   | IntConst _ -> IntConstET
-  | AddrConst _ -> AddrET
-  | This -> AddrET (* TODO: make more coherent with Solidity *)
+  | AddrConst _ -> AddrET(false)
+  | This -> AddrET(false) (* TODO: make more coherent with Solidity *)
   | BlockNum -> UintConstET
   | Var x -> (match lookup_type x vdl with
     | Some t -> t
@@ -80,8 +89,8 @@ let rec typecheck_expr (vdl : var_decl list) = function
     | _ -> failwith "TypeError: map" (* TODO: refine TypeError? *)
     ) 
   | BalanceOf(e) -> (match typecheck_expr vdl e with
-        AddrET -> UintET
-      | _ as t -> raise (TypeError (e,t,AddrET)))
+        AddrET(_) -> UintET
+      | _ as t -> raise (TypeError (e,t,AddrET(false))))
   | Not(e) -> (match typecheck_expr vdl e with
         BoolET -> BoolET
       | _ as t -> raise (TypeError (e,t,BoolET)))
@@ -131,10 +140,13 @@ let rec typecheck_expr (vdl : var_decl list) = function
       | IntET | UintET -> UintET
       | _ as t -> raise (TypeError (e,t,IntET)))
   | AddrCast(e) -> (match typecheck_expr vdl e with
-      | AddrET -> AddrET
-      | IntET -> AddrET
+      | AddrET(b) -> AddrET(b)
+      | IntET -> AddrET(false)
       | _ as t -> raise (TypeError (e,t,IntET))) 
-;;
+  | PayableCast(e) -> (match typecheck_expr vdl e with
+      | AddrET(_) -> AddrET(true)
+      | UintConstET -> AddrET(false)
+      | _ as t -> raise (TypeError (e,t,IntET))) 
 
 let is_immutable (x : ide) (vdl : var_decls) = 
   List.fold_left (fun acc vd -> match vd with
@@ -171,8 +183,9 @@ let rec typecheck_cmd (vdl : var_decl list) = function
         if te = BoolET then typecheck_cmd vdl c1 && typecheck_cmd vdl c2
         else raise (TypeError (e,te,BoolET))
     | Send(ercv,eamt) -> 
-        typecheck_expr vdl ercv = AddrET &&
-        typecheck_expr vdl eamt = IntET
+        typecheck_expr vdl ercv = AddrET(true)  (* can only send to payable addresses *) 
+        &&
+        subtype (typecheck_expr vdl eamt) UintET
     | Req(e) -> 
         let te = typecheck_expr vdl e in
         if te = BoolET then true else raise (TypeError (e,te,BoolET))

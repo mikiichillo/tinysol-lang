@@ -93,6 +93,23 @@ let%test "test_parse_contract_4" = try
   in false 
   with _ -> true
 
+let%test "test_parse_contract_5" = try 
+  parse_contract
+  "contract C { address payable a; function f() public payable { a.transfer(address(this).balance); } }"
+  =
+  (Contract ("C", [(VarT (AddrBT true, false), "a")],
+  [Proc ("f", [], Send (Var "a", BalanceOf (AddrCast This)), Public, true)]))
+  with _ -> false
+
+let%test "test_parse_contract_6" = try 
+  parse_contract
+  "contract C { function f(address payable a) public payable { a.transfer(address(this).balance); } }"
+  =
+  (Contract ("C", [],
+ [Proc ("f", [(VarT (AddrBT true, false), "a")],
+   Send (Var "a", BalanceOf (AddrCast This)), Public, true)]))
+  with _ -> false
+
 
 (********************************************************************************
  test_trace_cmd : (command, n_steps, variable, expected value after n_steps)
@@ -665,3 +682,42 @@ let%test "test_typecheck_53" = test_typecheck
       function f(int k) public { if (k>0) y = k; else k = y; }
   }"
   false
+
+let%test "test_typecheck_54" = test_typecheck 
+  "contract C { address payable a; function f() public payable { a.transfer(address(this).balance); } }"
+  true
+
+let%test "test_typecheck_55" = test_typecheck 
+  "contract C { function f(address payable a) public payable { a.transfer(address(this).balance); } }"
+  true
+
+let%test "test_typecheck_56" = test_typecheck 
+  "contract C { address a; function f() public payable { a.transfer(address(this).balance); } }"
+  false
+
+let%test "test_typecheck_57" = test_typecheck 
+  "contract C { function f(address a) public payable { a.transfer(address(this).balance); } }"
+  false
+
+let%test "test_typecheck_58" = test_typecheck 
+  "contract C { uint x; address payable a; function f() public payable { a.transfer(x); } }"
+  true
+
+let%test "test_typecheck_59" = test_typecheck 
+  "contract C { int x; address payable a; function f() public payable { a.transfer(x); } }"
+  false
+
+let%test "test_typecheck_60" = test_typecheck 
+  "contract C {
+      uint immutable y;
+      function f() public { address(\"0\").transfer(y); }
+  }"
+  false
+
+let%test "test_typecheck_61" = test_typecheck 
+  "contract C {
+      uint immutable y;
+      constructor() { y = 7; }
+  }"
+  true
+

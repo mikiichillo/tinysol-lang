@@ -81,8 +81,7 @@ let subtype t0 t1 = match t1 with
   | _ -> t0 = t1
 
 let rec typecheck_expr (edl : enum_decl list) (vdl : var_decl list) = function
-    True -> BoolConstET true
-  | False -> BoolConstET false
+  | BoolConst b -> BoolConstET b
   | IntConst n -> IntConstET n
   | AddrConst _ -> AddrET(false)
   | This -> AddrET(false) (* TODO: make more coherent with Solidity *)
@@ -158,7 +157,7 @@ let rec typecheck_expr (edl : enum_decl list) (vdl : var_decl list) = function
      | (t1,t2) when subtype t1 IntET && subtype t2 IntET -> BoolET
      | (t1,IntET) -> raise (TypeError (e1,t1,IntET))
      | (_,t2) -> raise (TypeError (e2,t2,IntET)))
-  | Le(e1,e2) ->
+  | Lt(e1,e2) ->
     (match (typecheck_expr edl vdl e1,typecheck_expr edl vdl e2) with
      | (IntConstET n1,IntConstET n2) -> BoolConstET (n1 < n2)
      | (t1,t2) when subtype t1 UintET && subtype t2 UintET -> BoolET
@@ -172,7 +171,7 @@ let rec typecheck_expr (edl : enum_decl list) (vdl : var_decl list) = function
      | (t1,t2) when subtype t1 IntET && subtype t2 IntET -> BoolET
      | (t1,IntET) -> raise (TypeError (e1,t1,IntET))
      | (_,t2) -> raise (TypeError (e2,t2,IntET)))
-  | Ge(e1,e2) ->
+  | Gt(e1,e2) ->
     (match (typecheck_expr edl vdl e1,typecheck_expr edl vdl e2) with
      | (IntConstET n1,IntConstET n2) -> BoolConstET (n1 > n2)
      | (t1,t2) when subtype t1 UintET && subtype t2 UintET -> BoolET

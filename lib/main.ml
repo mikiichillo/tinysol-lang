@@ -2,137 +2,6 @@ open Ast
 open Types
 open Utils
 
-(******************************************************************************)
-(*                       Big-step semantics of expressions                    *)
-(******************************************************************************)
-
-exception TypeError of string
-exception NoRuleApplies
-
-let is_val = function
-    True -> true
-  | False -> true
-  | IntConst _ -> true
-  | AddrConst _ -> true
-  | _ -> false
-
-let int_of_exprval v = match v with 
-  | Int n  -> n
-  | Bool _ -> failwith "value has type Bool but an Int was expected"
-  | Addr _ -> failwith "value has type Addr but an Int was expected"
-  | Map _  -> failwith "value has type Map but an Int was expected"
-
-let bool_of_exprval v = match v with 
-  | Bool b -> b
-  | Int _  -> failwith "value has type Int but an Bool was expected"
-  | Addr _ -> failwith "value has type Addr but an Bool was expected"
-  | Map _  -> failwith "value has type Map but an Bool was expected"
-
-
-let addr_of_exprval v = match v with 
-  | Addr a -> a
-  | Bool _ -> failwith "value has type Bool but an Addr was expected"
-  | Int _ -> failwith "value has type Int but an Addr was expected"
-  | Map _ -> failwith "value has type Map but an Addr was expected"
-
-let rec eval_expr (callee : addr) (st : sysstate) = function
-    True -> Bool true
-  | False -> Bool false
-  | IntConst n -> Int n
-  | AddrConst s -> Addr s
-  | This -> Addr callee
-  | BlockNum -> Int st.blocknum
-  | Var x -> lookup_var callee x st
-  | MapR(e1,e2) -> (match eval_expr callee st e1 with 
-    | Map m -> m (eval_expr callee st e2)
-    | _ -> failwith "Trying to apply a non-map variable"
-    )
-  | BalanceOf e ->
-    let b = addr_of_exprval (eval_expr callee st e) in
-    Int (lookup_balance b st)
-  | Not(e) -> (match eval_expr callee st e with
-        Bool b -> Bool(not b)
-      | _ -> raise (TypeError "Not")
-    )
-  | And(e1,e2) -> (match (eval_expr callee st e1,eval_expr callee st e2)  with
-        (Bool b1,Bool b2) -> Bool(b1 && b2)
-      | _ -> raise (TypeError "And")
-    )
-  | Or(e1,e2) -> (match (eval_expr callee st e1,eval_expr callee st e2)  with
-        (Bool b1,Bool b2) -> Bool(b1 || b2)
-      | _ -> raise (TypeError "Or")
-    )
-  | Add(e1,e2) -> (match (eval_expr callee st e1,eval_expr callee st e2)  with
-        (Int n1,Int n2) -> Int(n1 + n2)
-      | _ -> raise (TypeError "Add")
-    )    
-  | Sub(e1,e2) -> (match (eval_expr callee st e1,eval_expr callee st e2)  with
-        (Int n1,Int n2) -> Int(n1 - n2)
-      | _ -> raise (TypeError "Sub")
-    )
-  | Mul(e1,e2) -> (match (eval_expr callee st e1,eval_expr callee st e2)  with
-        (Int n1,Int n2) -> Int(n1 * n2)
-      | _ -> raise (TypeError "Add")
-    )        
-  | Eq(e1,e2) -> (match (eval_expr callee st e1,eval_expr callee st e2)  with
-        (Int n1,Int n2) -> Bool(n1 = n2)
-      | (Bool b1,Bool b2) -> Bool(b1 = b2)
-      | (Addr a1,Addr a2) -> Bool(a1 = a2)
-      | _ -> raise (TypeError "Eq")
-    )    
-  | Neq(e1,e2) -> (match (eval_expr callee st e1,eval_expr callee st e2)  with
-        (Int n1,Int n2) -> Bool(n1 <> n2)
-      | (Bool b1,Bool b2) -> Bool(b1 <> b2)
-      | (Addr a1,Addr a2) -> Bool(a1 <> a2)
-      | _ -> raise (TypeError "Eq")
-    )    
-  | Leq(e1,e2) -> (match (eval_expr callee st e1,eval_expr callee st e2)  with
-        (Int n1,Int n2) -> Bool(n1 <= n2)
-      | _ -> raise (TypeError "Leq")
-    )          
-  | Le(e1,e2) -> (match (eval_expr callee st e1,eval_expr callee st e2)  with
-        (Int n1,Int n2) -> Bool(n1 < n2)
-      | _ -> raise (TypeError "Le")
-    )          
-  | Geq(e1,e2) -> (match (eval_expr callee st e1,eval_expr callee st e2)  with
-        (Int n1,Int n2) -> Bool(n1 >= n2)
-      | _ -> raise (TypeError "Geq")
-    )          
-  | Ge(e1,e2) -> (match (eval_expr callee st e1,eval_expr callee st e2)  with
-        (Int n1,Int n2) -> Bool(n1 > n2)
-      | _ -> raise (TypeError "Ge")
-    )
-  | IfE(e1,e2,e3) -> (match (eval_expr callee st e1,eval_expr callee st e2, eval_expr callee st e3)  with
-        (Bool b,v2,v3) -> if b then v2 else v3
-      | _ -> raise (TypeError "IfE")
-    )
-  | IntCast(e) -> (match eval_expr callee st e  with
-      | Int n -> Int n
-      | _ -> raise (TypeError "IntCast")
-    )          
-  | UintCast(e) -> (match eval_expr callee st e  with
-      | Int n when n>=0-> Int n
-      | _ -> raise (TypeError "UintCast")
-    )
-  | AddrCast(e) -> (match eval_expr callee st e  with
-      | Addr a -> Addr a
-      | _ -> raise (TypeError "AddrCast")
-    )          
-  | PayableCast(e) -> (match eval_expr callee st e  with
-      | Addr a -> Addr a (* payable cast is only implemented by the type checker *)
-      | _ -> raise (TypeError "AddrCast")
-    )          
-  | EnumOpt(x,o) -> (match lookup_enum_option st callee x o with
-    | Some n -> Int n
-    | None -> failwith "Enum lookup failed (bug in typechecking?)")
-  | EnumCast(x,e) -> (match eval_expr callee st e with
-      | Int n -> (match reverse_lookup_enum_option st callee x n with
-        | Some _ -> Int n
-        | None -> raise (TypeError "EnumCast"))
-      | _ -> raise (TypeError "EnumCast: expression is not an Int")
-    )
-  | FunCall(_) -> failwith "TODO"
-  | ExecFunCall(_) -> failwith "TODO"
 
 let eval_var_decls (vdl : var_decl list) (e : env): env =
   List.fold_left
@@ -181,6 +50,7 @@ let blockify_fun = function
 let blockify_contract (Contract(c,el,vdl,fdl)) =
   Contract(c,el,vdl,List.map blockify_fun fdl)
 
+
 (******************************************************************************)
 (*              Retrieving contracts and functions from state                 *)
 (******************************************************************************)
@@ -225,32 +95,332 @@ let bind_fargs_aargs (xl : var_decl list) (vl : exprval list) : env =
   xl 
   vl 
 
+(******************************************************************************)
+(*                      Small-step semantics of expressions                   *)
+(******************************************************************************)
+
+exception TypeError of string
+exception NoRuleApplies
+
+let is_val = function
+  | BoolConst _ 
+  | IntConst _
+  | AddrConst _ -> true
+  | _ -> false
+
+let eval_expr0 = function
+  | BoolConst b -> (Bool b)
+  | IntConst n  -> (Int n)
+  | AddrConst s -> (Addr s)
+  | e -> failwith (string_of_expr e ^ " is not a value")
+
+let expr0_of_exprval = function
+  | Bool b -> BoolConst b
+  | Int n -> IntConst n
+  | Addr b -> AddrConst b
+  | Map _ -> failwith "step_expr: wrong type checking of map?"
+
+(* Il risultato di Var x deve diventare una espressione costante!! (idem per le mappe) *)
+
+let int_of_exprval v = match v with 
+  | Int n  -> n
+  | Bool _ -> failwith "value has type Bool but an Int was expected"
+  | Addr _ -> failwith "value has type Addr but an Int was expected"
+  | Map _  -> failwith "value has type Map but an Int was expected"
+
+let bool_of_exprval v = match v with 
+  | Bool b -> b
+  | Int _  -> failwith "value has type Int but an Bool was expected"
+  | Addr _ -> failwith "value has type Addr but an Bool was expected"
+  | Map _  -> failwith "value has type Map but an Bool was expected"
+
+let int_of_expr e = match e with 
+  | IntConst n  -> n
+  | _ -> failwith "IntConst was expected"
+
+let bool_of_expr e = match e with 
+  | BoolConst b -> b
+  | _  -> failwith "True or False was expected"
+
+let addr_of_expr e = match e with 
+  | AddrConst a -> a
+  | _ -> failwith "AddrConst was expected"
+
+let addr_of_exprval v = match v with 
+  | Addr a -> a
+  | Bool _ -> failwith "value has type Bool but an Addr was expected"
+  | Int _ -> failwith "value has type Int but an Addr was expected"
+  | Map _ -> failwith "value has type Map but an Addr was expected"
+
+let rec step_expr (e,st,a) = match e with
+  | e when is_val e -> raise NoRuleApplies
+
+  | This -> (AddrConst a, st, a)
+
+  | BlockNum -> (IntConst st.blocknum, st, a)
+
+  | Var x -> (expr0_of_exprval (lookup_var a x st), st, a)  
+
+  | MapR(Var x,e2) when is_val e2 -> (match lookup_var a x st with
+    | Map m -> (expr0_of_exprval (m (eval_expr0 e2)), st, a)
+    | _ -> failwith "step_expr: wrong type checking of map?")
+  | MapR(Var x,e2) ->
+    let (e2', st', a') = step_expr (e2, st, a) in (MapR(Var x,e2'), st', a')
+  | MapR(e1,e2) ->
+    let (e1', st', a') = step_expr (e1, st, a) in (MapR(e1',e2), st', a')
+
+  | BalanceOf e when is_val e -> 
+    let b = addr_of_expr e in (IntConst (lookup_balance b st), st, a)
+  | BalanceOf e -> 
+    let (e', st', a') = step_expr (e, st, a) in (BalanceOf e', st', a')
+
+  | Not(e) when is_val e -> 
+    let b = bool_of_expr e in (BoolConst (not b), st, a)
+  | Not(e) -> 
+    let (e', st', a') = step_expr (e, st, a) in (Not e', st', a')
+
+  | And(e1,e2) when is_val e1 && is_val e2 ->
+    let (b1,b2) = bool_of_expr e1,bool_of_expr e2 in 
+    (BoolConst (b1 && b2), st, a)         
+  | And(e1,e2) when is_val e1 ->
+    let (e2', st', a') = step_expr (e2, st, a) in (And(e1,e2'), st', a')
+  | And(e1,e2) -> 
+    let (e1', st', a') = step_expr (e1, st, a) in (And(e1',e2), st', a')
+
+  | Or(e1,e2) when is_val e1 && is_val e2 ->
+    let (b1,b2) = bool_of_expr e1,bool_of_expr e2 in 
+    (BoolConst(b1 || b2), st, a)         
+  | Or(e1,e2) when is_val e1 ->
+    let (e2', st', a') = step_expr (e2, st, a) in (Or(e1,e2'), st', a')
+  | Or(e1,e2) -> 
+    let (e1', st', a') = step_expr (e1, st, a) in (Or(e1',e2), st', a')
+
+  | Add(e1,e2) when is_val e1 && is_val e2 ->
+    let (n1,n2) = int_of_expr e1,int_of_expr e2 in 
+    (IntConst (n1+n2), st, a)         
+  | Add(e1,e2) when is_val e1 ->
+    let (e2', st', a') = step_expr (e2, st, a) in (Add(e1,e2'), st', a')
+  | Add(e1,e2) -> 
+    let (e1', st', a') = step_expr (e1, st, a) in (Add(e1',e2), st', a')
+
+  | Sub(e1,e2) when is_val e1 && is_val e2 ->
+    let (n1,n2) = int_of_expr e1,int_of_expr e2 in 
+    (IntConst (n1+n2), st, a)         
+  | Sub(e1,e2) when is_val e1 ->
+    let (e2', st', a') = step_expr (e2, st, a) in (Sub(e1,e2'), st', a')
+  | Sub(e1,e2) -> 
+    let (e1', st', a') = step_expr (e1, st, a) in (Sub(e1',e2), st', a')
+
+  | Mul(e1,e2) when is_val e1 && is_val e2 ->
+    let (n1,n2) = int_of_expr e1,int_of_expr e2 in 
+    (IntConst (n1*n2), st, a)         
+  | Mul(e1,e2) when is_val e1 ->
+    let (e2', st', a') = step_expr (e2, st, a) in (Mul(e1,e2'), st', a')
+  | Mul(e1,e2) -> 
+    let (e1', st', a') = step_expr (e1, st, a) in (Mul(e1',e2), st', a')
+
+  | Eq(e1,e2) when is_val e1 && is_val e2 -> (match e1,e2 with
+      | (IntConst n1,IntConst n2) -> (BoolConst(n1=n2), st, a)
+      | (AddrConst a1,AddrConst a2) -> (BoolConst(a1=a2), st, a)
+      | (BoolConst b1,BoolConst b2) -> (BoolConst(b1=b2), st, a)
+      | _ -> raise (TypeError "Eq"))
+  | Eq(e1,e2) when is_val e1 ->
+    let (e2', st', a') = step_expr (e2, st, a) in (Eq(e1,e2'), st', a')
+  | Eq(e1,e2) -> 
+    let (e1', st', a') = step_expr (e1, st, a) in (Eq(e1',e2), st', a')
+
+  | Neq(e1,e2) when is_val e1 && is_val e2 -> (match e1,e2 with
+      | (IntConst n1,IntConst n2) -> (BoolConst(n1<>n2), st, a)
+      | (AddrConst a1,AddrConst a2) -> (BoolConst(a1<>a2), st, a)
+      | (BoolConst b1,BoolConst b2) -> (BoolConst(b1<>b2), st, a)
+      | _ -> raise (TypeError "Neq"))
+  | Neq(e1,e2) when is_val e1 ->
+    let (e2', st', a') = step_expr (e2, st, a) in (Neq(e1,e2'), st', a')
+  | Neq(e1,e2) -> 
+    let (e1', st', a') = step_expr (e1, st, a) in (Neq(e1',e2), st', a')
+
+  | Leq(e1,e2) when is_val e1 && is_val e2 -> (match e1,e2 with
+      | (IntConst n1,IntConst n2) -> (BoolConst(n1<=n2), st, a)
+      | _ -> raise (TypeError "Leq"))
+  | Leq(e1,e2) when is_val e1 ->
+    let (e2', st', a') = step_expr (e2, st, a) in (Leq(e1,e2'), st', a')
+  | Leq(e1,e2) -> 
+    let (e1', st', a') = step_expr (e1, st, a) in (Leq(e1',e2), st', a')
+
+  | Lt(e1,e2) when is_val e1 && is_val e2 -> (match e1,e2 with
+      | (IntConst n1,IntConst n2) -> (BoolConst(n1<n2), st, a)
+      | _ -> raise (TypeError "Leq"))
+  | Lt(e1,e2) when is_val e1 ->
+    let (e2', st', a') = step_expr (e2, st, a) in (Lt(e1,e2'), st', a')
+  | Lt(e1,e2) -> 
+    let (e1', st', a') = step_expr (e1, st, a) in (Lt(e1',e2), st', a')
+
+  | Geq(e1,e2) when is_val e1 && is_val e2 -> (match e1,e2 with
+      | (IntConst n1,IntConst n2) -> (BoolConst(n1>=n2), st, a)
+      | _ -> raise (TypeError "Leq"))
+  | Geq(e1,e2) when is_val e1 ->
+    let (e2', st', a') = step_expr (e2, st, a) in (Geq(e1,e2'), st', a')
+  | Geq(e1,e2) -> 
+    let (e1', st', a') = step_expr (e1, st, a) in (Geq(e1',e2), st', a')
+
+  | Gt(e1,e2) when is_val e1 && is_val e2 -> (match e1,e2 with
+      | (IntConst n1,IntConst n2) -> (BoolConst(n1>n2), st, a)
+      | _ -> raise (TypeError "Leq"))
+  | Gt(e1,e2) when is_val e1 ->
+    let (e2', st', a') = step_expr (e2, st, a) in (Gt(e1,e2'), st', a')
+  | Gt(e1,e2) -> 
+    let (e1', st', a') = step_expr (e1, st, a) in (Gt(e1',e2), st', a')
+
+  | IfE(e1,e2,e3) when is_val e1 -> 
+    let b1 = bool_of_expr e1 in ((if b1 then e2 else e3), st, a)
+  | IfE(e1,e2,e3) -> 
+    let (e1', st', a') = step_expr (e1, st, a) in (IfE(e1',e2,e3), st', a')    
+
+  | IntCast(e) when is_val e -> 
+      let n = int_of_expr e in (IntConst n, st, a)
+  | IntCast(e) -> 
+    let (e', st', a') = step_expr (e, st, a) in (IntCast(e'), st', a')    
+
+  | UintCast(e) when is_val e -> 
+      let n = int_of_expr e in (IntConst n, st, a)
+  | UintCast(e) -> 
+    let (e', st', a') = step_expr (e, st, a) in (UintCast(e'), st', a')    
+
+  | AddrCast(e) when is_val e -> 
+      let b = addr_of_expr e in (AddrConst b, st, a)
+  | AddrCast(e) -> 
+    let (e', st', a') = step_expr (e, st, a) in (AddrCast(e'), st', a')    
+
+  | PayableCast(e) when is_val e -> 
+      let b = addr_of_expr e in (AddrConst b, st, a) (* payable cast is only implemented by the type checker *)
+  | PayableCast(e) -> 
+    let (e', st', a') = step_expr (e, st, a) in (PayableCast(e'), st', a')    
+
+  | EnumOpt(x,o) -> (match lookup_enum_option st a x o with
+    | Some n -> (IntConst n, st, a)
+    | None -> failwith "Enum lookup failed (bug in typechecking?)")
+
+  | EnumCast(x,e) when is_val e -> (match eval_expr0 e with
+      | Int n -> (match reverse_lookup_enum_option st a x n with
+        | Some _ -> (IntConst n, st, a)
+        | None -> raise (TypeError "EnumCast"))
+      | _ -> raise (TypeError "EnumCast: expression is not an Int")
+      )
+
+  | EnumCast(x,e) -> 
+    let (e', st', a') = step_expr (e, st, a) in (EnumCast(x,e'), st', a')    
+
+  | FunCall(e_to,f,e_value,e_args) when is_val e_to && is_val e_value && List.for_all is_val e_args ->  
+    (* retrieve function declaration *)
+    let _ = print_endline("1111111111111111111111111111111111111") in
+    let txto = addr_of_expr e_to in
+    let txvalue  = int_of_expr e_value in
+    let txargs = List.map (fun arg -> eval_expr0 arg) e_args in
+    if lookup_balance a st < txvalue then 
+      failwith ("sender " ^ a ^ " has not sufficient wei balance")
+    else
+    let sender_state = 
+      { (st.accounts a) with balance = (st.accounts a).balance - txvalue } in
+    let to_state  = 
+      { (st.accounts txto) with balance = (st.accounts txto).balance + txvalue } in 
+    let fdecl = Option.get (find_fun_in_sysstate st txto f) in  
+    (* setup new stack frame TODO *)
+    let xl = get_var_decls_from_fun fdecl in
+    let xl',vl' =
+      (VarT(AddrBT false,false),"msg.sender") :: (VarT(IntBT,false),"msg.value") :: xl,
+      Addr a :: Int txvalue :: txargs
+    in
+    let e' = bind_fargs_aargs xl' vl' in
+    let st' = { accounts = st.accounts 
+                  |> bind a sender_state
+                  |> bind txto to_state; 
+                stackenv = e' :: st.stackenv;
+                blocknum = st.blocknum;
+                active = st.active } in
+    let c = get_cmd_from_fun fdecl in
+    let _ = print_endline ("FunCall 1  @" ^ a ^ " --> @" ^ txto ^ " : " ^ string_of_cmd c) in
+    (ExecFunCall(c), st', txto)
+
+  | FunCall(e_to,f,e_value,e_args) when is_val e_to && is_val e_value -> 
+    let _ = print_endline("FunCall 2") in
+    let (e_args', st', _) = step_expr_list (e_args, st, a) in 
+    (FunCall(e_to,f,e_value,e_args'), st', a)
+
+  | FunCall(e_to,f,e_value,e_args) when is_val e_to -> 
+    let _ = print_endline("FunCall 3") in
+    let (e_value', st', _) = step_expr (e_value, st, a) in 
+    (FunCall(e_to,f,e_value',e_args), st', a)
+  
+  | FunCall(e_to,f,e_value,e_args) -> 
+    let _ = print_string("FunCall 4: " ^ string_of_expr e_to ^ " ---> ") in
+    let (e_to', st', _) = step_expr (e_to, st, a) in
+    let _ = print_endline(string_of_expr e_to') in
+    (FunCall(e_to',f,e_value,e_args), st', a)
+
+  | ExecFunCall(Return e) when is_val e ->
+    let _ = print_endline("ExecFunCall 1 @" ^ a ^ ": return " ^ string_of_expr e) in
+    (e, popenv st, a)
+
+  | ExecFunCall(c) -> (let _ = print_endline("ExecFunCall 2 @" ^ a ^ ": " ^ string_of_cmd c) in
+    match step_cmd (Cmd(c,st,a)) with
+    | St _ -> let _ = print_endline "ExecFunCall 2/St" in failwith "function terminated without return"
+    | Reverted -> let _ = print_endline "ExecFunCall 2/Rev" in failwith "no"
+    | Cmd(c',st',a') -> let _ = print_endline ("ExecFunCall 2/Cmd " ^ string_of_cmd c') in (ExecFunCall(c'),st',a'))
+
+  | _ -> assert(false)
+
+and step_expr_list (el,st,a) = match el with
+  | [] -> (el, st, a)
+  | e::tl when is_val e -> 
+    let (el',st', a') = step_expr_list (tl, st, a) in (e::el', st', a')
+  | e::tl -> 
+    let (e',st', a') = step_expr (e, st, a) in (e'::tl, st', a')
 
 (******************************************************************************)
 (*                       Small-step semantics of commands                     *)
 (******************************************************************************)
 
-let rec trace1_cmd = function
+and step_cmd = function
     St _ -> raise NoRuleApplies
   | Reverted -> Reverted
   | Cmd(c,st,a) -> (match c with
+
     | Skip -> St st
-    | Assign(x,e) -> (
-        St (update_var st a x (eval_expr a st e)))
-    | MapW(x,ek,ev) ->
-        let k = eval_expr a st ek in 
-        St (update_map st a x k (eval_expr a st ev))
-    | Seq(c1,c2) -> (match trace1_cmd (Cmd(c1,st,a)) with
+
+    | Assign(x,e) when is_val e ->
+        let _ = print_endline("Assign 1: " ^ a ^ "." ^ x ^ " = " ^ string_of_expr e) in
+        St (update_var st a x (eval_expr0 e))
+    | Assign(x,e) -> 
+      let _ = print_endline("Assign 2: " ^ a ^ "." ^ x ^ " = " ^ string_of_expr e) in
+      let (e', st', _) = step_expr (e, st, a) in 
+      Cmd(Assign(x,e'), st', a)
+      (* ERROR: e' should be evaluated in a', not in a *)
+
+    | MapW(x,ek,ev) when is_val ek && is_val ev ->
+        St (update_map st a x (eval_expr0 ek) (eval_expr0 ev))
+    | MapW(x,ek,ev) when is_val ek -> 
+      let (ev', st', _) = step_expr (ev, st, a) in 
+      Cmd(MapW(x,ek,ev'), st', a)
+    | MapW(x,ek,ev) -> 
+      let (ek', st', _) = step_expr (ek, st, a) in 
+      Cmd(MapW(x,ek',ev), st', a)
+    
+    | Seq(c1,c2) -> (match step_cmd (Cmd(c1,st,a)) with
         | St st1 -> Cmd(c2,st1,a)
         | Reverted -> Reverted
         | Cmd(c1',st1,a) -> Cmd(Seq(c1',c2),st1,a))
-    | If(e,c1,c2) -> (match eval_expr a st e with
+
+    | If(e,c1,c2) when is_val e -> (match eval_expr0 e with
           Bool true -> Cmd(c1,st,a)
         | Bool false -> Cmd(c2,st,a)
         | _ -> failwith("if: type error"))
-    | Send(ercv,eamt) -> 
-        let rcv = addr_of_exprval (eval_expr a st ercv) in 
-        let amt = int_of_exprval (eval_expr a st eamt) in
+    | If(e,c1,c2) -> 
+        let (e', st', _) = step_expr (e, st, a) in
+        Cmd(If(e',c1,c2), st', a)
+
+    | Send(ercv,eamt) when is_val ercv && is_val eamt -> 
+        let rcv = addr_of_expr ercv in 
+        let amt = int_of_expr eamt in
         let bal = (st.accounts a).balance in
         if bal<amt then failwith "insufficient balance" else
         let sender_state =  { (st.accounts a) with balance = (st.accounts a).balance - amt } in
@@ -260,23 +430,40 @@ let rec trace1_cmd = function
         else
           let rcv_state = { balance = amt; storage = botenv; code = None; } in
           St { st with accounts = st.accounts |> bind rcv rcv_state |> bind a sender_state; active = rcv::st.active }
+
+    | Send(ercv,eamt) when is_val ercv -> 
+        let (eamt', st', _) = step_expr (eamt, st, a) in
+        Cmd(Send(ercv,eamt'), st', a)
+
+    | Send(ercv,eamt) -> 
+        let (ercv', st', _) = step_expr (ercv, st, a) in
+        Cmd(Send(ercv',eamt), st', a)
+
+    | Req(e) when is_val e -> 
+        let b = bool_of_expr e in if b then St st else Reverted
     | Req(e) -> 
-        if eval_expr a st e = Bool true then St st 
-        else Reverted 
-    | Return(_) -> failwith "TODO"
+      let (e', st', _) = step_expr (e, st, a) in Cmd(Req(e'), st', a)
+
+    | Return(e) when is_val e -> failwith "in questo caso dovrei terminare??"
+    | Return(e) -> 
+      let (e', st', _) = step_expr (e, st, a) in Cmd(Return(e'), st', a)
+    
     | Block(vdl,c) ->
         let e' = eval_var_decls vdl botenv in
         Cmd(ExecBlock c, { st with stackenv = e'::st.stackenv} , a)
-    | ExecBlock(c) -> (match trace1_cmd (Cmd(c,st,a)) with
+
+    | ExecBlock(c) -> (match step_cmd (Cmd(c,st,a)) with
         | St st -> St (popenv st)
         | Reverted -> Reverted
         | Cmd(c1',st1,a') -> Cmd(ExecBlock(c1'),st1,a'))
+
     | Decl _ -> assert(false) (* should not happen after blockify *)
-    | ProcCall(e_to,f,e_value,e_args) ->
+
+    | ProcCall(e_to,f,e_value,e_args) when is_val e_to && is_val e_value && List.for_all is_val e_args ->
         (* retrieve function declaration *)
-        let txto   = addr_of_exprval (eval_expr a st e_to) in
-        let txvalue  = int_of_exprval (eval_expr a st e_value) in
-        let txargs = List.map (fun arg -> eval_expr a st arg) e_args in
+        let txto   = addr_of_expr e_to in
+        let txvalue  = int_of_expr e_value in
+        let txargs = List.map (fun arg -> eval_expr0 arg) e_args in
         if lookup_balance a st < txvalue then 
           failwith ("sender " ^ a ^ " has not sufficient wei balance")
         else
@@ -300,7 +487,25 @@ let rec trace1_cmd = function
                     active = st.active } in
         let c = get_cmd_from_fun fdecl in
         Cmd(ExecBlock(c), st', txto)
+
+    | ProcCall(e_to,f,e_value,e_args) when is_val e_to && is_val e_value -> 
+      let (e_args', st', a') = step_expr_list (e_args, st, a) in 
+      Cmd(ProcCall(e_to,f,e_value,e_args'), st', a')
+
+    | ProcCall(e_to,f,e_value,e_args) when is_val e_to -> 
+      let (e_value', st', a') = step_expr (e_value, st, a) in 
+      Cmd(ProcCall(e_to,f,e_value',e_args), st', a')
+
+    | ProcCall(e_to,f,e_value,e_args) -> 
+      let (e_to', st', a') = step_expr (e_to, st, a) in 
+      Cmd(ProcCall(e_to',f,e_value,e_args), st', a')
+
   )
+
+(* recursively evaluate expression until it reaches a value (might not terminate) *)
+let rec eval_expr (a : addr) (st : sysstate) (e : expr) : exprval = 
+  if is_val e then eval_expr0 e
+  else let (e', st' , a') = step_expr (e, st, a) in eval_expr a' st' e'  
 
 let default_value = function 
   IntBT  
@@ -328,7 +533,7 @@ let exec_cmd (n_steps : int) (c : cmd) (a : addr) (st : sysstate) : exec_state =
   let rec exec_rec_cmd n s =
     if n<=0 then s
     else try
-        let s' = trace1_cmd s
+        let s' = step_cmd s
         in exec_rec_cmd (n-1) s'
       with NoRuleApplies -> s
     in exec_rec_cmd n_steps (Cmd (c,st,a))
@@ -337,7 +542,7 @@ let trace_cmd n_steps (c:cmd) (a:addr) (st : sysstate) : exec_state list =
   let rec trace_rec_cmd n t =
     if n<=0 then [t]
     else try
-        let t' = trace1_cmd t
+        let t' = step_cmd t
         in t::(trace_rec_cmd (n-1) t')
       with NoRuleApplies -> [t]
   in trace_rec_cmd n_steps (Cmd(c,st,a))

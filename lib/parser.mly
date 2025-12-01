@@ -13,9 +13,9 @@ open Ast
 %token EQ
 %token NEQ
 %token LEQ
-%token LE
+%token LT
 %token GEQ
-%token GE
+%token GT
 %token DOT
 %token <string> ID
 %token <string> CONST
@@ -79,7 +79,7 @@ open Ast
 %left OR
 %left AND
 %nonassoc NOT
-%nonassoc EQ NEQ LEQ GEQ LE GE
+%nonassoc EQ NEQ LEQ GEQ LT GT
 %left PLUS MINUS
 %nonassoc UMINUS
 %left MUL
@@ -149,8 +149,8 @@ expr:
   | e = expr; DOT; o = ID { match e with Var(x) -> EnumOpt(x,o) | _ -> failwith "enum parser error"}
   | e1 = expr; LPAREN; e2 = expr; RPAREN { match e1 with Var(x) -> EnumCast(x,e2) | _ -> failwith "enum parser error"}
   | e_to = expr; DOT; f = ID; e_value = opt_value; LPAREN; e_args = separated_list(ARGSEP, expr); RPAREN { FunCall(e_to,f,e_value,e_args) }
-  | TRUE { True }
-  | FALSE { False }
+  | TRUE { BoolConst true }
+  | FALSE { BoolConst false }
   | BLOCKNUM { BlockNum }
   | NOT; e=expr { Not e }
   | MINUS; e=expr %prec UMINUS { Sub(IntConst 0, e) }
@@ -162,9 +162,9 @@ expr:
   | e1=expr; EQ; e2=expr { Eq(e1,e2) }
   | e1=expr; NEQ; e2=expr { Neq(e1,e2) }
   | e1=expr; LEQ; e2=expr { Leq(e1,e2) }
-  | e1=expr; LE; e2=expr { Le(e1,e2) }
+  | e1=expr; LT; e2=expr { Lt(e1,e2) }
   | e1=expr; GEQ; e2=expr { Geq(e1,e2) }
-  | e1=expr; GE; e2=expr { Ge(e1,e2) }
+  | e1=expr; GT; e2=expr { Gt(e1,e2) }
   | e1=expr; LSQUARE; e2=expr; RSQUARE { MapR(e1,e2) }
   | LPAREN; e1 = expr; RPAREN; QMARK; e2 = expr; COLON; e3 = expr { IfE(e1,e2,e3) }
   | INT; LPAREN; e=expr; RPAREN; { IntCast(e) }

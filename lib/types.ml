@@ -20,7 +20,13 @@ type sysstate = {
   active: addr list; (* set of all active addresses (for debugging)*)
 }
 
-(* execution state *)
+(* execution state of an expression *)
+type exec_expr =  
+  | ValSt of exprval * sysstate     (* togliere!!! *)
+  | ExprSt of expr * sysstate * addr
+  | ExprRev (* reverted *)
+
+(* execution state of a command *)
 type exec_state = 
   | St of sysstate 
   | Cmd of cmd * sysstate * addr

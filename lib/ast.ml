@@ -7,8 +7,7 @@ type addr = string
 (* expressions *)
 
 type expr =
-  | True
-  | False
+  | BoolConst of bool
   | IntConst of int
   | AddrConst of addr
   | BlockNum
@@ -25,9 +24,9 @@ type expr =
   | Eq of expr * expr
   | Neq of expr * expr
   | Leq of expr * expr
-  | Le of expr * expr           
+  | Lt of expr * expr           
   | Geq of expr * expr
-  | Ge of expr * expr
+  | Gt of expr * expr
   | IfE of expr * expr * expr           
   | IntCast of expr
   | UintCast of expr

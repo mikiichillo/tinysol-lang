@@ -68,8 +68,7 @@ let rec union l1 l2 = match l1 with
   | x::l1' -> (if List.mem x l2 then [] else [x]) @ union l1' l2
 
 let rec vars_of_expr = function
-    True
-  | False
+  | BoolConst _
   | IntConst _
   | AddrConst _
   | This 
@@ -91,9 +90,9 @@ let rec vars_of_expr = function
   | Eq(e1,e2) 
   | Neq(e1,e2) 
   | Leq(e1,e2) 
-  | Le(e1,e2)
+  | Lt(e1,e2)
   | Geq(e1,e2) 
-  | Ge(e1,e2) -> union (vars_of_expr e1) (vars_of_expr e2)                    
+  | Gt(e1,e2) -> union (vars_of_expr e1) (vars_of_expr e2)                    
   | IfE(e1,e2,e3) -> union (vars_of_expr e1) (union (vars_of_expr e2) (vars_of_expr e3))
   | EnumCast(x,e) ->  union [x] (vars_of_expr e)
   | FunCall(e_to,_,e_value,e_args) -> union (vars_of_expr e_to) (union (vars_of_expr e_value) 
@@ -136,8 +135,7 @@ let string_of_modifier = function
 let string_of_args = List.fold_left (fun s a -> s ^ (if s<>"" then "," else "") ^ (string_of_exprval a)) ""
 
 let rec string_of_expr = function
-    True -> "true"
-  | False -> "false"
+  | BoolConst b -> if b then "true" else "false"
   | IntConst n -> string_of_int n
   | AddrConst a -> "\"" ^ a ^ "\""
   | This -> "this"
@@ -154,9 +152,9 @@ let rec string_of_expr = function
   | Eq(e1,e2) -> string_of_expr e1 ^ "==" ^ string_of_expr e2
   | Neq(e1,e2) -> string_of_expr e1 ^ "!=" ^ string_of_expr e2
   | Leq(e1,e2) -> string_of_expr e1 ^ "<=" ^ string_of_expr e2
-  | Le(e1,e2) -> string_of_expr e1 ^ "<" ^ string_of_expr e2                    
+  | Lt(e1,e2) -> string_of_expr e1 ^ "<" ^ string_of_expr e2                    
   | Geq(e1,e2) -> string_of_expr e1 ^ ">=" ^ string_of_expr e2
-  | Ge(e1,e2) -> string_of_expr e1 ^ ">" ^ string_of_expr e2
+  | Gt(e1,e2) -> string_of_expr e1 ^ ">" ^ string_of_expr e2
   | IfE(e1,e2,e3) -> "(" ^ string_of_expr e1 ^ ")?" ^ string_of_expr e2 ^ ":" ^ string_of_expr e3
   | IntCast(e) -> "int(" ^ string_of_expr e ^ ")"
   | UintCast(e) -> "int(" ^ string_of_expr e ^ ")"

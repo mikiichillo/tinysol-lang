@@ -37,9 +37,9 @@ rule read_token =
   | "==" { EQ }
   | "!=" { NEQ }
   | "<=" { LEQ }  
-  | "<" { LE }
+  | "<" { LT }
   | ">=" { GEQ }  
-  | ">" { GE }
+  | ">" { GT }
   | "=>" { MAPSTO }
   | "this" { THIS }
   | "msg.sender" { MSGSENDER }

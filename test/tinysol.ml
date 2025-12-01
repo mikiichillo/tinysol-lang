@@ -61,15 +61,15 @@ let%test "test_parse_cmd_8" = test_parse_cmd
 
 let%test "test_parse_cmd_9" = test_parse_cmd
   "x = (true)?1:0;"
-  (Assign ("x", IfE (True, IntConst 1, IntConst 0)))
+  (Assign ("x", IfE (BoolConst true, IntConst 1, IntConst 0)))
 
 let%test "test_parse_cmd_10" = test_parse_cmd
   "x = (true)?(false)?0:1:2;"
-  (Assign ("x", IfE (True, IfE (False, IntConst 0, IntConst 1), IntConst 2)))
+  (Assign ("x", IfE (BoolConst true, IfE (BoolConst false, IntConst 0, IntConst 1), IntConst 2)))
 
 let%test "test_parse_cmd_11" = test_parse_cmd
   "x = (true)?0:(false)?0:1;"
-  (Assign ("x", IfE (True, IntConst 0, IfE (False, IntConst 0, IntConst 1))))
+  (Assign ("x", IfE (BoolConst true, IntConst 0, IfE (BoolConst false, IntConst 0, IntConst 1))))
 
 let%test "test_parse_contract_1" = try 
   let _ = parse_contract
@@ -141,10 +141,10 @@ let%test "test_parse_contract_8" = try
   with _ -> false
 
 (********************************************************************************
- test_trace_cmd : (command, n_steps, variable, expected value after n_steps)
+ test_exec_cmd : (command, n_steps, variable, expected value after n_steps)
  ********************************************************************************)
 
-let test_trace_cmd (c,n_steps,var,exp_val) =
+let test_exec_cmd (c,n_steps,var,exp_val) =
   c
   |> parse_cmd
   |> blockify_cmd
@@ -154,62 +154,62 @@ let test_trace_cmd (c,n_steps,var,exp_val) =
   | Cmd(_,st,_) -> lookup_var "0xCAFE" var st = exp_val
   | Reverted -> false
 
-let%test "test_trace_cmd_1" = test_trace_cmd
+let%test "test_exec_cmd_1" = test_exec_cmd
   ("{ int x; x=51; skip; }", 2, "x", Int 51)  
 
-let%test "test_trace_cmd_2" = test_trace_cmd
-  ("{ int x; x=51; x=x+1; skip; }", 3, "x", Int 52)  
+let%test "test_exec_cmd_2" = test_exec_cmd
+  ("{ int x; x=51; x=x+1; skip; }", 5, "x", Int 52)  
 
-let%test "test_trace_cmd_3" = test_trace_cmd
-  ("{ int x; x=51; { int x; x=42; } x=x+1; skip; }", 5, "x", Int 52)  
+let%test "test_exec_cmd_3" = test_exec_cmd
+  ("{ int x; x=51; { int x; x=42; } x=x+1; skip; }", 7, "x", Int 52)  
 
-let%test "test_trace_cmd_4" = test_trace_cmd
+let%test "test_exec_cmd_4" = test_exec_cmd
   ("{ int x; x=51; { int x; x=42; skip; skip; skip; } x=x+1; skip; }", 5, "x", Int 42)  
 
-let%test "test_trace_cmd_5" = test_trace_cmd
-  ("{ int x; x=51; { int x; x=x+1; skip; skip; skip; } x=x+1; skip; }", 5, "x", Int 1)  
+let%test "test_exec_cmd_5" = test_exec_cmd
+  ("{ int x; x=51; { int x; x=x+1; skip; skip; skip; } x=x+1; skip; }", 6, "x", Int 1)  
 
-let%test "test_trace_cmd_6" = test_trace_cmd
-  ("{ int x; x=51; { int x; x=1; } { int x; x=x+3; } x=x+5; skip; }", 7, "x", Int 56)  
+let%test "test_exec_cmd_6" = test_exec_cmd
+  ("{ int x; x=51; { int x; x=1; } { int x; x=x+3; } x=x+5; skip; }", 11, "x", Int 56)  
 
-let%test "test_trace_cmd_7" = test_trace_cmd
-  ("{ int x; x=51; { int y; y=x+1; skip; } { x = 0; } x=x+5; skip; }", 8, "x", Int 5)  
+let%test "test_exec_cmd_7" = test_exec_cmd
+  ("{ int x; x=51; { int y; y=x+1; skip; } { x = 0; } x=x+5; skip; }", 12, "x", Int 5)  
 
-let%test "test_trace_cmd_8" = test_trace_cmd
-  ("{ int x; x=51; { int y; y=x+1; skip; } { int x; x = 0; } x=x+5; skip; }", 8, "x", Int 56)  
+let%test "test_exec_cmd_8" = test_exec_cmd
+  ("{ int x; x=51; { int y; y=x+1; skip; } { int x; x = 0; } x=x+5; skip; }", 12, "x", Int 56)  
 
-let%test "test_trace_cmd_9" = test_trace_cmd
-  ("{ bool b; b = 2==2; skip; }", 2, "b", Bool true)  
+let%test "test_exec_cmd_9" = test_exec_cmd
+  ("{ bool b; b = 2==2; skip; }", 3, "b", Bool true)  
 
-let%test "test_trace_cmd_10" = test_trace_cmd
-  ("{ int x; if (x==0) x=1; else x=2; skip; }", 3, "x", Int 1)  
+let%test "test_exec_cmd_10" = test_exec_cmd
+  ("{ int x; if (x==0) x=1; else x=2; skip; }", 5, "x", Int 1)  
 
-let%test "test_trace_cmd_11" = test_trace_cmd
-  ("{ int x; if (x>0) x=1; else x=2; skip; }", 3, "x", Int 2)  
+let%test "test_exec_cmd_11" = test_exec_cmd
+  ("{ int x; if (x>0) x=1; else x=2; skip; }", 5, "x", Int 2)  
 
-let%test "test_trace_cmd_12" = test_trace_cmd
+let%test "test_exec_cmd_12" = test_exec_cmd
   ("{ int x; bool b; if (b) x=2; else b=true; skip; }", 2, "x", Int 0)  
 
-let%test "test_trace_cmd_13" = test_trace_cmd
-  ("{ int x; uint y; y=5; x = (y>5)?2:3; skip; }", 3, "x", Int 3)  
+let%test "test_exec_cmd_13" = test_exec_cmd
+  ("{ int x; uint y; y=5; x = (y>5)?2:3; skip; }", 6, "x", Int 3)  
 
-let%test "test_trace_cmd_14" = test_trace_cmd
-  ("{ int x; uint y; y=5; x = (y<=5)?2:3; skip; }", 3, "x", Int 2)  
+let%test "test_exec_cmd_14" = test_exec_cmd
+  ("{ int x; uint y; y=5; x = (y<=5)?2:3; skip; }", 6, "x", Int 2)  
 
-let%test "test_trace_cmd_15" = test_trace_cmd
-  ("{ int x; uint y; y=5; x = (y<=(x==0)?5:4)?2:3; skip; }", 3, "x", Int 2)  
+let%test "test_exec_cmd_15" = test_exec_cmd
+  ("{ int x; uint y; y=5; x = (y<=(x==0)?5:4)?2:3; skip; }", 9, "x", Int 2)  
 
-let%test "test_trace_cmd_16" = test_trace_cmd
-  ("{ int x; uint y; y=5; x = (y<=(x!=0)?5:4)?2:3; skip; }", 3, "x", Int 3)  
+let%test "test_exec_cmd_16" = test_exec_cmd
+  ("{ int x; uint y; y=5; x = (y<=(x!=0)?5:4)?2:3; skip; }", 9, "x", Int 3)  
 
-let%test "test_trace_cmd_17" = test_trace_cmd
-  ("{ int x; uint y1; int y0; y1=5; y0=8; x = (true)?y1:y0; skip; }", 4, "x", Int 5)  
+let%test "test_exec_cmd_17" = test_exec_cmd
+  ("{ int x; uint y1; int y0; y1=5; y0=8; x = (true)?y1:y0; skip; }", 6, "x", Int 5)  
 
-let%test "test_trace_cmd_18" = test_trace_cmd
-  ("{ uint x; uint y; y = 6; x = (y>5)?uint(y):1 + 3; skip; }", 3, "x", Int 6) 
+let%test "test_exec_cmd_18" = test_exec_cmd
+  ("{ uint x; uint y; y = 6; x = (y>5)?uint(y):1 + 3; skip; }", 8, "x", Int 6) 
 
-let%test "test_trace_cmd_19" = test_trace_cmd
-  ("{ uint x; x=1; { int x; x=x+1; { int x; x=x+2; } x=x+3; } x=x+4; skip; }", 8, "x", Int 5) 
+let%test "test_exec_cmd_19" = test_exec_cmd
+  ("{ uint x; x=1; { int x; x=x+1; { int x; x=x+2; } x=x+3; } x=x+4; skip; }", 16, "x", Int 5) 
 
 (********************************************************************************
  test_exec_tx : 
@@ -305,18 +305,18 @@ let c4 = "contract C {
     }
 }"
 
-let%test "test_exec_tx_7" = test_exec_tx
+let%test "test_exec_tx_8" = test_exec_tx
   c4
   ["0xA:0xC.f()"] 
   ["x==0"; "this.balance==0"]
 
-let%test "test_exec_tx_8" = test_exec_tx
+let%test "test_exec_tx_9" = test_exec_tx
   c4
   ["0xA:0xC.f{value : 3}()"] 
   ["x==1"; "this.balance==3"]
 
 
-let%test "test_exec_tx_8" = test_exec_tx
+let%test "test_exec_tx_10" = test_exec_tx
   "contract C {
       int x;
       int y;
@@ -326,7 +326,7 @@ let%test "test_exec_tx_8" = test_exec_tx
   ["0xA:0xC.g(1)"; "0xA:0xC.f(2)"] 
   ["x==1"; "y==0"]
 
-let%test "test_exec_tx_9" = test_exec_tx
+let%test "test_exec_tx_11" = test_exec_tx
   "contract C {
       uint x;
       function f(int y) public { x=7; x = uint(y)-1; }
@@ -336,6 +336,15 @@ let%test "test_exec_tx_9" = test_exec_tx
 
 
 let%test "test_map_1" = test_exec_tx
+  "contract C {
+      mapping (uint => uint) m;
+      uint x;
+      function g(int k) public { x= (m[k]==0)?1:2; }
+  }"
+  ["0xA:0xC.g(0)"] 
+  ["x==1"]
+
+let%test "test_map_2" = test_exec_tx
   "contract C {
       mapping (uint => uint) m;
       uint x;
@@ -429,41 +438,65 @@ let test_exec_fun (src1: string) (src2: string) (txl : string list) (els : (addr
   |> fun st -> List.map (fun (a,x) -> x |> parse_expr |> eval_expr a st) els 
   |> List.for_all (fun v -> v = Bool true)
 
-let%test "test_fun_1" = test_exec_fun
+let%test "test_proc_1" = test_exec_fun
   "contract C { uint x; function f() public { x+=1;} }"
   "contract D { C c; uint x; constructor() payable { c = \"0xC\"; } function g() public { c.f(); } }"
   ["0xA:0xD.g()"] 
   [("0xC","x==1"); ("0xD","x==0")]
 
-let%test "test_fun_2" = test_exec_fun
+let%test "test_proc_2" = test_exec_fun
   "contract C { uint x; function f() public { x+=1;} }"
   "contract D { C c; uint x; constructor() payable { c = \"0xC\"; } function g() public { c.f(); } }"
   ["0xA:0xD.g()"; "0xA:0xD.g()"] 
   [("0xC","x==2"); ("0xD","x==0")]
 
-let%test "test_fun_3" = test_exec_fun
+let%test "test_proc_3" = test_exec_fun
   "contract C { uint x; function f() public { x+=1; require(x==0); } }"
   "contract D { C c; uint x; constructor() payable { c = \"0xC\"; } function g() public { x=2; c.f(); } }"
   ["0xA:0xD.g()"] 
   [("0xC","x==0"); ("0xD","x==0")]
 
-let%test "test_fun_4" = test_exec_fun
+let%test "test_proc_4" = test_exec_fun
   "contract C { uint x; function f(uint n) public { x+=n; } }"
   "contract D { C c; constructor() payable { c = \"0xC\"; } function g() public { c.f(1); } }"
   ["0xA:0xD.g()"] 
   [("0xC","x==1")]
 
-let%test "test_fun_5" = test_exec_fun
+let%test "test_proc_5" = test_exec_fun
   "contract C { uint x; function f(uint n) public { x+=n; } }"
   "contract D { C c; constructor() payable { c = \"0xC\"; } function g() public { c.f(1); } }"
   ["0xA:0xD.g()"; "0xA:0xD.g()"] 
   [("0xC","x==2")]
 
-let%test "test_fun_6" = test_exec_fun
+let%test "test_proc_6" = test_exec_fun
   "contract C { function f() public payable { require(msg.value > 0); } }"
   "contract D { C c; constructor() payable { c = \"0xC\"; } function g() public { c.f{value:1}(); } }"
   ["0xA:0xD.g()"; "0xA:0xD.g()"] 
   [("0xC","this.balance==2"); ("0xD","this.balance==98")]
+
+let%test "test_proc_7" = test_exec_fun
+  "contract C { uint x; function f(uint n1, uint n2) public { x+=n1+n2; } }"
+  "contract D { C c; constructor() payable { c = \"0xC\"; } function g() public { c.f(1+2,3+4); } }"
+  ["0xA:0xD.g()"] 
+  [("0xC","x==10")]
+
+let%test "test_fun_1" = test_exec_fun
+  "contract C { function f() public returns(int) { return(1); } }"
+  "contract D { C c; uint x; constructor() payable { c = \"0xC\"; } function g() public { x = c.f(); } }"
+  ["0xA:0xD.g()"] 
+  [("0xD","x==1")]
+
+let%test "test_fun_2" = test_exec_fun
+  "contract C { function f() public returns(int) { return(1+2+3+4);} }"
+  "contract D { C c; uint x; constructor() payable { c = \"0xC\"; } function g() public { x = c.f(); } }"
+  ["0xA:0xD.g()"] 
+  [("0xD","x==10")]
+
+let%test "test_fun_3" = test_exec_fun
+  "contract C { uint y; function f() public returns(int) { y+=1; return(y+1);} }"
+  "contract D { C c; uint x; constructor() payable { c = \"0xC\"; } function g() public { x = c.f(); } }"
+  ["0xA:0xD.g()"] 
+  [("0xC","y==1"); ("0xD","x==2")]
 
 let test_typecheck (src: string) (exp : bool)=
   let c = src |> parse_contract |> blockify_contract in 

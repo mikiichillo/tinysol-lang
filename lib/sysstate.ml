@@ -206,14 +206,14 @@ let bind_fargs_aargs (xl : var_decl list) (vl : exprval list) : env =
     failwith "exec_tx: length mismatch between formal and actual arguments"
   else 
   List.fold_left2 
-  (fun acc x_decl v -> match (x_decl,v) with 
-    | ((VarT(IntBT,_),x), Int _)
-    | ((VarT(UintBT,_),x), Uint _)
-    | ((VarT(BoolBT,_),x), Bool _) 
-    | ((VarT(AddrBT _,_),x), Addr _)          -> bind x v acc
-    | ((VarT(IntBT,_),x), Uint n)             -> bind x (Int n) acc
-    | ((VarT(UintBT,_),x), Int n) when n>=0   -> bind x (Uint n) acc
-    | ((MapT(_),_),_) -> failwith "Maps cannot be passed as function parameters"
+  (fun acc vd v -> match vd.ty , v with 
+    | VarT(IntBT), Int _
+    | VarT(UintBT), Uint _
+    | VarT(BoolBT), Bool _ 
+    | VarT(AddrBT _), Addr _          -> bind vd.name v acc
+    | VarT(IntBT), Uint n             -> bind vd.name (Int n) acc
+    | VarT(UintBT), Int n when n>=0   -> bind vd.name (Uint n) acc
+    | MapT(_),_ -> failwith "Maps cannot be passed as function parameters"
     | _ -> failwith "exec_tx: type mismatch between formal and actual arguments") 
   botenv 
   xl 

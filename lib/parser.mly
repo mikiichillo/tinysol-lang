@@ -62,6 +62,7 @@ open Cli_ast
 %token ARGSEP
 %token PUBLIC
 %token PRIVATE
+%token INTERNAL
 %token PAYABLE
 %token IMMUTABLE
 %token RETURNS 
@@ -91,7 +92,7 @@ open Cli_ast
 %start <contract> contract
 %type <exprval> value
 %type <var_decl> var_decl
-%type <visibility> visibility
+%type <visibility_t> visibility_t
 %type <fun_decl> fun_decl
 %type <cmd> cmd
 %type <var_decl list> formal_args
@@ -199,17 +200,18 @@ opt_immutable:
   | /* empty */ { false }
 
 var_type:
-  | t = base_type; i = opt_immutable { VarT(t,i) }
+  | t = base_type; { VarT(t) }
   | MAPPING; LPAREN; t1 = base_type; opt_id; MAPSTO; t2 = base_type; opt_id; RPAREN { MapT(t1,t2) }
 
-var_decl:
-  | t = var_type; x = ID { t,x }
-  | t = ID; i = opt_immutable; x = ID { VarT(CustomBT(t),i),x }
-;
-
-visibility:
+visibility_t:
   | PUBLIC { Public }
   | PRIVATE { Private }
+  | INTERNAL { Internal }
+;
+
+var_decl:
+  | t = var_type; i = opt_immutable; x = ID { { ty = t; name = x; visibility = Internal; immutable=i; } }
+  | t = ID; i = opt_immutable; x = ID { { ty = VarT(CustomBT(t)); name = x; visibility = Internal; immutable = i; } }
 ;
 
 nonseq_cmd:
@@ -254,17 +256,17 @@ fun_decl:
   /* constructor(al) payable? { c } */ 
   | CONSTR; LPAREN; al = formal_args; RPAREN; p = opt_payable; LBRACE; c = opt_cmd; RBRACE { Constr(al,c,p) }
   /* function f(al) [public|private]? payable? returns(r)? { c } */
-  | FUN; f = ID; LPAREN; al = formal_args; RPAREN; v=visibility; p = opt_payable; r = opt_returns; LBRACE; c = opt_cmd; RBRACE { Proc(f,al,c,v,p,r) }
+  | FUN; f = ID; LPAREN; al = formal_args; RPAREN; v=visibility_t; p = opt_payable; r = opt_returns; LBRACE; c = opt_cmd; RBRACE { Proc(f,al,c,v,p,r) }
 ;
 
 formal_args:
   | a = separated_list(ARGSEP, formal_arg) { a } ;
 
 formal_arg:
-  | INT;  x = ID { VarT(IntBT,false),x }
-  | UINT; x = ID { VarT(UintBT,false),x }
-  | BOOL; x = ID { VarT(BoolBT,false),x }
-  | ADDR; p = opt_payable; x = ID { VarT(AddrBT(p),false),x }
+  | INT;  x = ID { { ty = VarT(IntBT); name = x; visibility = Private; immutable = false; } }
+  | UINT; x = ID { { ty = VarT(UintBT); name = x; visibility = Private; immutable = false; } }
+  | BOOL; x = ID { { ty = VarT(BoolBT); name = x; visibility = Private; immutable = false; } }
+  | ADDR; p = opt_payable; x = ID { { ty = VarT(AddrBT(p)); name = x; visibility = Private; immutable = false; } }
 ;
 
 opt_value_tx:

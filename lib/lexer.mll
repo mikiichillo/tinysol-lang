@@ -71,6 +71,7 @@ rule read_token =
   | "enum" { ENUM }
   | "public" { PUBLIC }
   | "private" { PRIVATE }
+  | "internal" { INTERNAL }
   | "payable" { PAYABLE }
   | "immutable" { IMMUTABLE }
   | "returns" { RETURNS }

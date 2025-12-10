@@ -90,9 +90,9 @@ let lookup_type (x : ide) (vdl : var_decl list) : exprtype option =
   if x="msg.sender" then Some (AddrET false)
   else if x="msg.value" then Some UintET else 
   vdl 
-  |> List.map (fun vd -> match vd with
-    | VarT(t,_),x  -> (exprtype_of_decltype t),x 
-    | MapT(tk,tv),x -> MapET(exprtype_of_decltype tk, exprtype_of_decltype tv),x)
+  |> List.map (fun vd -> match vd.ty with
+    | VarT(t)   -> (exprtype_of_decltype t),vd.name 
+    | MapT(tk,tv) -> MapET(exprtype_of_decltype tk, exprtype_of_decltype tv),vd.name)
   |> List.fold_left
   (fun acc (t,y) -> if acc=None && x=y then Some t else acc)
   None
@@ -108,7 +108,7 @@ let rec dup = function
  *)
 let no_dup_var_decls vdl = 
   vdl 
-  |> List.map (fun vd -> match vd with (_,x) -> x) 
+  |> List.map (fun vd -> vd.name) 
   |> dup
   |> fun res -> match res with None -> Ok () | Some x -> Error ([MultipleDecl x])  
 
@@ -316,16 +316,11 @@ let rec typecheck_expr (edl : enum_decl list) (vdl : var_decl list) = function
   | ExecFunCall(_) -> failwith "TODO: ExecFunCall"
 
 let is_immutable (x : ide) (vdl : var_decl list) = 
-  List.fold_left (fun acc vd -> match vd with
-  | VarT(_,i),y when y=x -> i
-  | _ -> acc  
-  ) 
-  false 
-  vdl
+  List.fold_left (fun acc vd -> acc || (vd.name=x && vd.immutable)) false vdl
 
 let typecheck_local_decls (vdl : var_decl list) = List.fold_left
-  (fun acc vd -> match vd with 
-    | MapT(_),x -> acc >> Error [MapInLocalDecl x]
+  (fun acc vd -> match vd.ty with 
+    | MapT(_) -> acc >> Error [MapInLocalDecl vd.name]
     | _ -> acc)
   (Ok ())
   vdl

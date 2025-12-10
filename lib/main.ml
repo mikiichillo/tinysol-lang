@@ -245,7 +245,8 @@ let rec step_expr (e,st) = match e with
     (* setup new callstack frame *)
     let xl = get_var_decls_from_fun fdecl in
     let xl',vl' =
-      (VarT(AddrBT false,false),"msg.sender") :: (VarT(UintBT,false),"msg.value") :: xl,
+      { ty=VarT(AddrBT false); name="msg.sender"; visibility=Private; immutable=false; } :: 
+      { ty=VarT(UintBT); name="msg.value"; visibility=Private; immutable=false; } :: xl,
       Addr txfrom :: Uint txvalue :: txargs
     in
     let fr' = { callee = txto; locals = [bind_fargs_aargs xl' vl'] } in 
@@ -366,14 +367,14 @@ and step_cmd = function
     
     | Block(vdl,c) ->
         let r' = List.fold_left (fun acc vd ->
-          match vd with
-            | VarT(IntBT,_),x  -> acc       |> bind x (Int 0) 
-            | VarT(UintBT,_),x -> acc       |> bind x (Uint 0)
-            | VarT(BoolBT,_),x -> acc       |> bind x (Bool false)
-            | VarT(AddrBT _,_),x -> acc     |> bind x (Addr "0")
-            | VarT(EnumBT _,_),x -> acc     |> bind x (Uint 0)
-            | VarT(CustomBT _,_),x -> acc   |> bind x (Addr "0") (* TODO: contract?? *)
-            | MapT(_),_ -> failwith "mappings cannot be used in local declarations" 
+          match vd.ty with
+            | VarT(IntBT)  -> acc       |> bind vd.name (Int 0) 
+            | VarT(UintBT) -> acc       |> bind vd.name (Uint 0)
+            | VarT(BoolBT) -> acc       |> bind vd.name (Bool false)
+            | VarT(AddrBT _) -> acc     |> bind vd.name (Addr "0")
+            | VarT(EnumBT _) -> acc     |> bind vd.name (Uint 0)
+            | VarT(CustomBT _) -> acc   |> bind vd.name (Addr "0") (* TODO: contract?? *)
+            | MapT(_) -> failwith "mappings cannot be used in local declarations" 
         ) botenv vdl in
         let fr,frl = (List.hd st.callstack),(List.tl st.callstack) in
         let fr' = { fr with locals = r'::fr.locals } in
@@ -404,7 +405,8 @@ and step_cmd = function
         (* setup new stack frame TODO *)
         let xl = get_var_decls_from_fun fdecl in
         let xl',vl' =
-          (VarT(AddrBT false,false),"msg.sender") :: (VarT(UintBT,false),"msg.value") :: xl,
+          { ty=VarT(AddrBT false); name="msg.sender"; visibility=Private; immutable=false; } :: 
+          { ty=VarT(UintBT); name="msg.value"; visibility=Private; immutable=false; } :: xl,
           Addr txfrom :: Uint txvalue :: txargs
         in
         let fr' = { callee = txto; locals = [bind_fargs_aargs xl' vl'] } in
@@ -452,11 +454,13 @@ let default_value = function
 
 let init_storage (Contract(_,_,vdl,_)) : ide -> exprval =
   List.fold_left (fun acc vd -> 
-      let (x,v) = (match vd with 
-        | VarT(t,_),x -> (x, default_value t)
-        | MapT(_,tv),x -> (x, Map (fun _ -> (default_value tv)))
-      )
-      in bind x v acc) botenv vdl 
+    let (x,v) = (match vd.ty with 
+      | VarT(t)     -> (vd.name, default_value t)
+      | MapT(_,tv)  -> (vd.name, Map (fun _ -> (default_value tv)))
+    )
+    in bind x v acc) 
+  botenv 
+  vdl 
 
 let init_sysstate = { 
     accounts = (fun a -> failwith ("account " ^ a ^ " unbound")); 
@@ -551,11 +555,12 @@ let exec_tx (n_steps : int) (tx: transaction) (st : sysstate) : (sysstate,string
           let xl',vl' =
             if deploy then match tx.txargs with 
               _::al -> 
-              (VarT(AddrBT false,false),"msg.sender") :: xl,
+              { ty=VarT(AddrBT false); name="msg.sender"; visibility=Private; immutable=false; } :: xl,
               Addr tx.txsender :: al
               | _ -> assert(false) (* should never happen *)
             else
-              (VarT(AddrBT false,false),"msg.sender") :: (VarT(UintBT,false),"msg.value") :: xl,
+              { ty=VarT(AddrBT false); name="msg.sender"; visibility=Private; immutable=false; } :: 
+              { ty=VarT(UintBT); name="msg.value"; visibility=Private; immutable=false; } :: xl,
               Addr tx.txsender :: Uint tx.txvalue :: tx.txargs
           in
           let fr' = { callee = tx.txto; locals = [bind_fargs_aargs xl' vl'] } in

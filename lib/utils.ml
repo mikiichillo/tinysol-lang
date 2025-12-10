@@ -195,9 +195,9 @@ let enumify_base_type (enums : enum_decl list) (bt : base_type) : base_type = ma
   | _ as other -> other
 
 let enumify_decls (enums : enum_decl list) (vdl : var_decl list) : var_decl list = List.map (
-  fun (vt,x) -> match vt with
-    | VarT(bt,im)   -> VarT(enumify_base_type enums bt,im),x 
-    | MapT(bt1,bt2) -> MapT(enumify_base_type enums bt1, enumify_base_type enums bt2),x
+  fun vd -> match vd.ty with
+    | VarT(bt)   -> { vd with ty = VarT(enumify_base_type enums bt) } 
+    | MapT(bt1,bt2) -> { vd with ty = MapT(enumify_base_type enums bt1, enumify_base_type enums bt2) }
   ) 
   vdl 
 

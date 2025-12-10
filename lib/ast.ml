@@ -71,23 +71,27 @@ and base_type =
   | EnumBT of ide
 
 (* Variable types, consisting of:
-  - a base type with a bool i telling whether the variable is mutable (i=false) or immutable (i=true)
+  - a base type, or
   - a mapping from a base type to another base type
 *)
 
-and var_type = VarT of base_type * bool | MapT of base_type * base_type
+and var_type = VarT of base_type | MapT of base_type * base_type
+
+and visibility_t = 
+  | Public 
+  | Private
+  | Internal
 
 (* a variable declaration (t,x) consists of:
    - a type t
    - an identifier x of the variable
+   - a variable visibility modifier (default is internal)
+   - a bool i telling whether the variable is mutable (i=false) or immutable (i=true)
  *)
-and var_decl = var_type * ide 
 
-(* Function visilibility modifiers *)
+(* Visilibility modifiers *)
 
-and visibility = 
-  | Public 
-  | Private
+and var_decl = { ty: var_type; name: ide; visibility: visibility_t; immutable: bool }
 
 (* Function declarations
   - the constructor is always public, and it can be payable
@@ -96,7 +100,7 @@ and visibility =
 
 and fun_decl =
   | Constr of var_decl list * cmd * bool (* payable *)
-  | Proc of ide * var_decl list * cmd * visibility * bool * (base_type option) 
+  | Proc of ide * var_decl list * cmd * visibility_t * bool * (base_type option) 
 
 type enum_decl = Enum of (ide * ide list)
 

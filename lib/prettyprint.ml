@@ -45,7 +45,7 @@ let rec vars_of_expr = function
 
 and vars_of_cmd = function
   | Skip -> []
-  | Decl(_,x) -> [x]
+  | Decl(vd) -> [vd.name]
   | Assign(x,e) -> union [x] (vars_of_expr e)
   | MapW(x,ek,ev) -> union [x] (union (vars_of_expr ek) (vars_of_expr ev))
   | Seq(c1,c2) -> union (vars_of_cmd c1) (vars_of_cmd c2)
@@ -60,7 +60,7 @@ and vars_of_cmd = function
     (List.fold_left (fun acc ea -> union acc (vars_of_expr ea)) [] e_args))
   
 let vars_of_contract (Contract(_,_,vdl,_)) : ide list = 
-  List.fold_left (fun acc vd -> match vd with _,x -> x::acc ) [] vdl 
+  List.fold_left (fun acc vd -> vd.name::acc ) [] vdl 
 
 
 (******************************************************************************)
@@ -74,9 +74,10 @@ let string_of_exprval = function
   | Addr s -> s
   | Map _  -> "<map>" (* do not expand map *) 
 
-let string_of_modifier = function
-  | Public -> "public"
-  | Private -> "private"
+let string_of_visibility = function
+  | Public    -> "public"
+  | Private   -> "private"
+  | Internal  -> "internal"
 
 let string_of_args = List.fold_left (fun s a -> s ^ (if s<>"" then "," else "") ^ (string_of_exprval a)) ""
 
@@ -150,11 +151,14 @@ and string_of_base_type = function
 | EnumBT x -> x
 
 and string_of_var_type = function
-| VarT(t,i) -> string_of_base_type t ^ (if i then " immutable" else "")
+| VarT(t) -> string_of_base_type t
 | MapT(tk,tv) -> "mapping (" ^ string_of_base_type tk ^ " => " ^ string_of_base_type tv ^ ")"
 
-and string_of_var_decl ((t,x) : var_decl) : string = 
-  string_of_var_type t ^ " " ^ x
+and string_of_var_decl (vd : var_decl) : string = 
+  string_of_var_type vd.ty ^ " " ^ 
+  string_of_visibility vd.visibility ^ " " ^ 
+  (if vd.immutable then "immutable " else "") ^
+  vd.name
 
 let string_of_var_decls = List.fold_left (fun s d -> s ^ (if s<>"" then ";\n  " else "  ") ^ string_of_var_decl d) ""
 
@@ -163,7 +167,7 @@ let string_of_fun_args = List.fold_left (fun s d -> s ^ (if s<>"" then ", " else
 let string_of_fun_decl = function 
   | Proc(f,al,c,v,p,r) -> 
     "function " ^ f ^ "(" ^ (string_of_fun_args al) ^ ") " ^
-    string_of_modifier v ^ " " ^
+    string_of_visibility v ^ " " ^
     (if p then "payable " else "") ^
     (match r with None -> "" | Some t -> "returns(" ^ string_of_base_type t ^ ") ") ^ 
     "{" ^ string_of_cmd c ^ "}\n"

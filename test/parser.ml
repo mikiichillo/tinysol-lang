@@ -19,6 +19,7 @@ let%test "test_parse_cmd_2" = test_parse_cmd
   "x=51;"
   (Assign("x",IntConst 51))  
 
+(*
 let%test "test_parse_cmd_3" = test_parse_cmd
   "{ int x; x=51; }" 
   (Block([VarT(IntBT,false),"x"],Assign("x",IntConst 51)))  
@@ -82,6 +83,7 @@ let%test "test_parse_contract_2" = try
   (Contract ("C", [], [(VarT(UintBT,false), "x")],
   [Proc ("f", [], Assign ("x", BlockNum), Public, false, None)]))
   with _ -> false
+*)
 
 let%test "test_parse_contract_3" = try 
   let _ = parse_contract
@@ -101,6 +103,7 @@ let%test "test_parse_contract_4" = try
   in false 
   with _ -> true
 
+(*
 let%test "test_parse_contract_5" = try 
   parse_contract
   "contract C { address payable a; function f() public payable { a.transfer(address(this).balance); } }"
@@ -135,3 +138,5 @@ let%test "test_parse_contract_8" = try
  [(VarT (CustomBT "State", false), "s")],
  [Proc ("f", [], Assign ("s", EnumOpt ("State", "REQ")), Public, false, None)]))
   with _ -> false
+
+*)

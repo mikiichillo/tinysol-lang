@@ -3,7 +3,7 @@ open TinysolLib.Sysstate
 open TinysolLib.Utils
 open TinysolLib.Cli
 open TinysolLib.Prettyprint
-open TinysolLib.Static
+open TinysolLib.Typechecker
 ;;
 
 match Array.length(Sys.argv) with

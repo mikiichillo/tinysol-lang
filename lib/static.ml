@@ -25,12 +25,16 @@ let rec string_of_exprtype = function
   | UintET          -> "uint"
   | AddrET p        -> "address" ^ (if p then " payable" else "")
   | CustomET x      -> x
-  | EnumET x      -> x
+  | EnumET x        -> x
   | MapET(t1,t2)    -> string_of_exprtype t1 ^ " => " ^ string_of_exprtype t2
 
+(* the result of the contract typechecker is either:
+  - Ok():       if all static checks passed
+  - Error log:  if some checks did not pass; the log collects all the errors found 
+ *)
 type typecheck_result = (unit,exn list) result
-type typecheck_expr_result = (exprtype,exn list) result
 
+(* >> merges two contract typechecker results *)
 let (>>)  (out1 : typecheck_result) (out2 : typecheck_result) : typecheck_result =
   match out1 with
   | Ok () -> out2
@@ -38,6 +42,14 @@ let (>>)  (out1 : typecheck_result) (out2 : typecheck_result) : typecheck_result
     | Ok () -> Error log1 
     | Error log2 -> Error (log1 @ log2)
 
+(* the result of the expression typechecker is either:
+  - Ok(t):      if all static checks passed, and t is the inferred type of the expression
+  - Error log:  if some checks did not pass; the log collects all the errors found 
+ *)
+
+type typecheck_expr_result = (exprtype,exn list) result
+
+(* >>+ merges two expression typechecker results *)
 let (>>+)  (out1 : typecheck_expr_result) (out2 : typecheck_expr_result) : typecheck_expr_result =
   match out1,out2 with
   | Ok _,Ok _ -> assert(false) (* should not happen *)
@@ -45,12 +57,13 @@ let (>>+)  (out1 : typecheck_expr_result) (out2 : typecheck_expr_result) : typec
   | Error log1, Ok _ -> Error log1 
   | Error log1,Error log2 -> Error (log1 @ log2)
 
+(* boring cast from expression typechecker result to contract typechecker result*)
 let typeckeck_result_from_expr_result (out : typecheck_expr_result) : typecheck_result =
   match out with
   | Error log -> Error log
   | Ok(_) -> Ok()
 
-(* TypeError(expression, inferred type, expected type) *)
+(* The following exceptions represent the all possible errors detected by the typechecker *)
 exception TypeError of expr * exprtype * exprtype
 exception NotMapError of expr
 exception ImmutabilityError of ide
@@ -62,6 +75,7 @@ exception EnumDupName of ide
 exception EnumDupOption of ide * ide
 exception MapInLocalDecl of ide
 
+(* Pretty *)
 let string_of_typecheck_error = function
 |  TypeError(e,t1,t2) -> 
     "expression " ^ (string_of_expr e) ^ 
@@ -76,7 +90,7 @@ let string_of_typecheck_error = function
 | EnumDupName x -> "enum " ^ x ^ " is declared multiple times"
 | EnumDupOption (x,o) -> "enum option " ^ o ^ " is declared multiple times in enum " ^ x
 | MapInLocalDecl x -> "mapping " ^ x ^ " not admitted in local declaration" 
-| _ -> "Unknown typechecking error"
+| ex -> Printexc.to_string ex
 
 let exprtype_of_decltype = function
   | IntBT  -> IntET
@@ -86,18 +100,49 @@ let exprtype_of_decltype = function
   | EnumBT _   -> UintET
   | CustomBT _ -> UintET (* TODO: be more precise? *)
 
-let lookup_type (x : ide) (vdl : var_decl list) : exprtype option =
+
+(* typechecker functions take as input the list of variable declarations:
+  - var_decl:       state variables 
+  - local_var_decl: local variables
+  The type all_var_decls encapsulates the list of these variables.
+*)
+
+type all_var_decls = (var_decl list) * (local_var_decl list)
+
+let get_state_var_decls (avdl : all_var_decls) : var_decl list = fst avdl 
+let get_local_var_decls (avdl : all_var_decls) : local_var_decl list = snd avdl 
+
+(* merges a list of state variable decls and a list of local variable decls *)
+let merge_var_decls (vdl : var_decl list) (lvdl : local_var_decl list) : all_var_decls = vdl , lvdl  
+
+(* adds a list of local variables to all_var_decls *)
+let push_local_decls ((vdl: var_decl list),(old_lvdl : local_var_decl list)) new_lvdl = 
+  (vdl , new_lvdl @ old_lvdl)  
+
+let lookup_type (x : ide) (avdl : all_var_decls) : exprtype option =
   if x="msg.sender" then Some (AddrET false)
-  else if x="msg.value" then Some UintET else 
-  vdl 
-  |> List.map (fun vd -> match vd.ty with
+  else if x="msg.value" then Some UintET else
+  (* first lookup the local variables *)
+  avdl 
+  |> get_local_var_decls 
+  |> List.map (fun (vd : local_var_decl) -> match vd.ty with
     | VarT(t)   -> (exprtype_of_decltype t),vd.name 
     | MapT(tk,tv) -> MapET(exprtype_of_decltype tk, exprtype_of_decltype tv),vd.name)
   |> List.fold_left
   (fun acc (t,y) -> if acc=None && x=y then Some t else acc)
   None
-
-let merge_var_decls old_vdl new_vdl = new_vdl @ old_vdl  
+  |>
+  fun res -> match res with
+    | Some t -> Some t
+    | None -> (* if not found, lookup the state variables *)
+      avdl 
+      |> get_state_var_decls  
+      |> List.map (fun (vd : var_decl) -> match vd.ty with
+        | VarT(t)   -> (exprtype_of_decltype t),vd.name 
+        | MapT(tk,tv) -> MapET(exprtype_of_decltype tk, exprtype_of_decltype tv),vd.name)
+      |> List.fold_left
+      (fun acc (t,y) -> if acc=None && x=y then Some t else acc)
+      None
 
 let rec dup = function 
   | [] -> None
@@ -108,7 +153,13 @@ let rec dup = function
  *)
 let no_dup_var_decls vdl = 
   vdl 
-  |> List.map (fun vd -> vd.name) 
+  |> List.map (fun (vd : var_decl) -> vd.name) 
+  |> dup
+  |> fun res -> match res with None -> Ok () | Some x -> Error ([MultipleDecl x])  
+
+let no_dup_local_var_decls vdl = 
+  vdl 
+  |> List.map (fun (vd : local_var_decl) -> vd.name) 
   |> dup
   |> fun res -> match res with None -> Ok () | Some x -> Error ([MultipleDecl x])  
 
@@ -128,19 +179,18 @@ let subtype t0 t1 = match t1 with
   | IntET -> (match t0 with IntConstET _ | IntET -> true | _ -> false) (* uint is not convertible to int *)
   | _ -> t0 = t1
 
-let rec typecheck_expr (edl : enum_decl list) (vdl : var_decl list) = function
+let rec typecheck_expr (edl : enum_decl list) vdl = function
   | BoolConst b -> Ok (BoolConstET b)
 
   | IntConst n -> Ok (IntConstET n)
 
-  | IntVal _
-  | UintVal _ -> assert(false) (* these expressions are at runtime only *)
+  | IntVal _ | UintVal _ -> assert(false) (* these expressions only occur at runtime *)
 
   | AddrConst _ -> Ok (AddrET false)
 
-  | This -> Ok(AddrET false) (* TODO: make more coherent with Solidity *)
-
   | BlockNum -> Ok(UintET)
+
+  | This -> Ok(AddrET false) (* TODO: check coherence with Solidity *)
 
   | Var x -> (match lookup_type x vdl with
     | Some t -> Ok(t)
@@ -190,18 +240,18 @@ let rec typecheck_expr (edl : enum_decl list) (vdl : var_decl list) = function
      | _,Ok(t2) -> Error [TypeError (e2,t2,IntET)]
      | err1,err2 -> err1 >>+ err2)
 
-  | Mul(e1,e2) ->
+  | Sub(e1,e2) ->
     (match (typecheck_expr edl vdl e1,typecheck_expr edl vdl e2) with
-     | Ok(IntConstET n1),Ok(IntConstET n2) -> Ok(IntConstET (n1*n2))
+     | Ok(IntConstET n1),Ok(IntConstET n2) -> Ok(IntConstET (n1-n2))
      | Ok(t1),Ok(t2) when subtype t1 UintET && subtype t2 UintET -> Ok(UintET)
      | Ok(t1),Ok(t2) when subtype t1 IntET && subtype t2 IntET -> Ok(IntET)
      | Ok(t1),_ when not (subtype t1 IntET) -> Error [TypeError (e1,t1,IntET)]
      | _,Ok(t2) -> Error [TypeError (e2,t2,IntET)]
      | err1,err2 -> err1 >>+ err2)
 
-  | Sub(e1,e2) ->
+  | Mul(e1,e2) ->
     (match (typecheck_expr edl vdl e1,typecheck_expr edl vdl e2) with
-     | Ok(IntConstET n1),Ok(IntConstET n2) -> Ok(IntConstET (n1-n2))
+     | Ok(IntConstET n1),Ok(IntConstET n2) -> Ok(IntConstET (n1*n2))
      | Ok(t1),Ok(t2) when subtype t1 UintET && subtype t2 UintET -> Ok(UintET)
      | Ok(t1),Ok(t2) when subtype t1 IntET && subtype t2 IntET -> Ok(IntET)
      | Ok(t1),_ when not (subtype t1 IntET) -> Error [TypeError (e1,t1,IntET)]
@@ -313,24 +363,25 @@ let rec typecheck_expr (edl : enum_decl list) (vdl : var_decl list) = function
       | err -> err)
 
   | FunCall(_) -> failwith "TODO: FunCall"
-  | ExecFunCall(_) -> failwith "TODO: ExecFunCall"
+
+  | ExecFunCall(_) -> assert(false) (* this should not happen at static time *)
 
 let is_immutable (x : ide) (vdl : var_decl list) = 
-  List.fold_left (fun acc vd -> acc || (vd.name=x && vd.immutable)) false vdl
+  List.fold_left (fun acc (vd : var_decl) -> acc || (vd.name=x && vd.immutable)) false vdl
 
-let typecheck_local_decls (vdl : var_decl list) = List.fold_left
+let typecheck_local_decls (vdl : local_var_decl list) = List.fold_left
   (fun acc vd -> match vd.ty with 
     | MapT(_) -> acc >> Error [MapInLocalDecl vd.name]
     | _ -> acc)
   (Ok ())
   vdl
 
-let rec typecheck_cmd (is_constr : bool) (edl : enum_decl list) (vdl : var_decl list) = function 
+let rec typecheck_cmd (is_constr : bool) (edl : enum_decl list) (vdl : all_var_decls) = function 
     | Skip -> Ok ()
 
     | Assign(x,e) -> 
         (* the immutable modifier is not checked for the constructor *)
-        if not is_constr && is_immutable x vdl then Error [ImmutabilityError x]
+        if not is_constr && is_immutable x (get_state_var_decls vdl) then Error [ImmutabilityError x]
         else (
           match typecheck_expr edl vdl e,typecheck_expr edl vdl (Var x) with
           | Ok(te),Ok(tx) -> if subtype te tx then Ok() else Error [TypeError (e,te,tx)]
@@ -352,7 +403,7 @@ let rec typecheck_cmd (is_constr : bool) (edl : enum_decl list) (vdl : var_decl 
         >>
         typecheck_cmd is_constr edl vdl c2
 
-    | If(e,c1,c2) -> (match typecheck_expr  edl vdl e with
+    | If(e,c1,c2) -> (match typecheck_expr edl vdl e with
           | Ok(BoolConstET true)  -> typecheck_cmd is_constr edl vdl c1
           | Ok(BoolConstET false) -> typecheck_cmd is_constr edl vdl c2
           | Ok(BoolET) -> 
@@ -377,25 +428,32 @@ let rec typecheck_cmd (is_constr : bool) (edl : enum_decl list) (vdl : var_decl 
           | Ok(te) -> Error [TypeError (e,te,BoolET)]
           | res -> typeckeck_result_from_expr_result res)
 
-    | Return(_) -> failwith "TODO"
-
-    | Block(lvdl,c) -> 
+    | Block(lvdl,c) ->
         typecheck_local_decls lvdl
         >>
-        let vdl' = merge_var_decls vdl lvdl in
+        let vdl' = push_local_decls vdl lvdl in
         typecheck_cmd is_constr edl vdl' c
 
-    | _ -> failwith "TODO (Call)"
+    | ExecBlock(_) -> assert(false) (* should not happen at static time *)
+
+    | Decl(_) -> assert(false) (* should not happen after blockify *)
+
+    | ProcCall(_) -> failwith "TODO: Call"
+
+    | ExecProcCall(_) -> assert(false) (* should not happen at static time *)
+
+    | Return(_) -> failwith "TODO: Return"
+
 
 let typecheck_fun (edl : enum_decl list) (vdl : var_decl list) = function
   | Constr (al,c,_) ->
-      no_dup_var_decls al
+      no_dup_local_var_decls al
       >>
       typecheck_local_decls al
       >> 
       typecheck_cmd true edl (merge_var_decls vdl al) c
   | Proc (_,al,c,_,__,_) ->
-      no_dup_var_decls al
+      no_dup_local_var_decls al
       >> 
       typecheck_local_decls al
       >>
@@ -420,7 +478,7 @@ let typecheck_enums (edl : enum_decl list) =
 (* typecheck_contract : contract -> (unit,string) result 
     Perform several static checks on a given contract. The result is:
     - Ok () if all checks succeed 
-    - Error msg otherwise, where msg explains the reason of the failed check     
+    - Error log otherwise, where log explains the reasons of the failed checks     
  *)
 
 let typecheck_contract (Contract(_,edl,vdl,fdl)) : typecheck_result =

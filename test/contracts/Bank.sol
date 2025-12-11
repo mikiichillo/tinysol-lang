@@ -14,6 +14,6 @@ contract Bank {
 
         credits[msg.sender] -= amount;
 
-        msg.sender.transfer(amount);
+        payable(msg.sender).transfer(amount);
     }
 }

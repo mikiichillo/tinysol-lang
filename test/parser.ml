@@ -19,11 +19,11 @@ let%test "test_parse_cmd_2" = test_parse_cmd
   "x=51;"
   (Assign("x",IntConst 51))  
 
-(*
 let%test "test_parse_cmd_3" = test_parse_cmd
   "{ int x; x=51; }" 
-  (Block([VarT(IntBT,false),"x"],Assign("x",IntConst 51)))  
+  (Block([{ ty=VarT(IntBT); name="x"; }],Assign("x",IntConst 51)))  
 
+(*
 let%test "test_parse_cmd_4" = test_parse_cmd
   "{ int x; x=51; x=x+1; }"
   (Block([VarT(IntBT,false),"x"],Seq(Assign("x",IntConst 51),Assign("x",Add(Var "x",IntConst 1)))))  

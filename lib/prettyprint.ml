@@ -60,7 +60,7 @@ and vars_of_cmd = function
     (List.fold_left (fun acc ea -> union acc (vars_of_expr ea)) [] e_args))
   
 let vars_of_contract (Contract(_,_,vdl,_)) : ide list = 
-  List.fold_left (fun acc vd -> vd.name::acc ) [] vdl 
+  List.fold_left (fun acc (vd : var_decl) -> vd.name::acc ) [] vdl 
 
 
 (******************************************************************************)
@@ -78,6 +78,7 @@ let string_of_visibility = function
   | Public    -> "public"
   | Private   -> "private"
   | Internal  -> "internal"
+  | External  -> "external"
 
 let string_of_args = List.fold_left (fun s a -> s ^ (if s<>"" then "," else "") ^ (string_of_exprval a)) ""
 
@@ -120,7 +121,7 @@ let rec string_of_expr = function
 
 and string_of_cmd = function
   | Skip -> "skip;"
-  | Decl d -> string_of_var_decl d ^ " ;"
+  | Decl d -> string_of_local_var_decl d ^ " ;"
   | Assign(x,e) -> x ^ " = " ^ string_of_expr e ^ ";"
   | MapW(x,ek,ev) -> x ^ "[" ^ string_of_expr ek ^ "] = " ^ string_of_expr ev ^ ";"
   | Seq(c1,c2) -> string_of_cmd c1 ^ " " ^ string_of_cmd c2
@@ -129,7 +130,7 @@ and string_of_cmd = function
   | Req(e) -> "require " ^ string_of_expr e ^ ";"
   | Return e -> "return " ^ string_of_expr e ^ ";"
   | Block(vdl,c) -> "{" 
-    ^ List.fold_left (fun s d -> s ^ string_of_var_decl d ^ "; ") "" vdl 
+    ^ List.fold_left (fun s d -> s ^ string_of_local_var_decl d ^ "; ") "" vdl 
     ^ string_of_cmd c 
     ^ "}"
   | ExecBlock(c) -> "{" 
@@ -160,9 +161,15 @@ and string_of_var_decl (vd : var_decl) : string =
   (if vd.immutable then "immutable " else "") ^
   vd.name
 
+and string_of_local_var_decl (vd : local_var_decl) : string = 
+  string_of_var_type vd.ty ^ " " ^ 
+  vd.name
+
 let string_of_var_decls = List.fold_left (fun s d -> s ^ (if s<>"" then ";\n  " else "  ") ^ string_of_var_decl d) ""
 
-let string_of_fun_args = List.fold_left (fun s d -> s ^ (if s<>"" then ", " else "") ^ string_of_var_decl d) ""
+let string_of_local_var_decls = List.fold_left (fun s d -> s ^ (if s<>"" then ";\n  " else "  ") ^ string_of_local_var_decl d) ""
+
+let string_of_fun_args = List.fold_left (fun s d -> s ^ (if s<>"" then ", " else "") ^ string_of_local_var_decl d) ""
 
 let string_of_fun_decl = function 
   | Proc(f,al,c,v,p,r) -> 

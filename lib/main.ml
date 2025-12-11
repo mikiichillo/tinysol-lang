@@ -245,9 +245,10 @@ let rec step_expr (e,st) = match e with
     (* setup new callstack frame *)
     let xl = get_var_decls_from_fun fdecl in
     let xl',vl' =
-      { ty=VarT(AddrBT false); name="msg.sender"; visibility=Private; immutable=false; } :: 
-      { ty=VarT(UintBT); name="msg.value"; visibility=Private; immutable=false; } :: xl,
-      Addr txfrom :: Uint txvalue :: txargs
+      { ty=VarT(AddrBT false); name="msg.sender"; } :: 
+      { ty=VarT(UintBT); name="msg.value"; } :: xl,
+      Addr txfrom :: 
+      Uint txvalue :: txargs
     in
     let fr' = { callee = txto; locals = [bind_fargs_aargs xl' vl'] } in 
     let st' = { accounts = st.accounts 
@@ -405,9 +406,10 @@ and step_cmd = function
         (* setup new stack frame TODO *)
         let xl = get_var_decls_from_fun fdecl in
         let xl',vl' =
-          { ty=VarT(AddrBT false); name="msg.sender"; visibility=Private; immutable=false; } :: 
-          { ty=VarT(UintBT); name="msg.value"; visibility=Private; immutable=false; } :: xl,
-          Addr txfrom :: Uint txvalue :: txargs
+          { ty=VarT(AddrBT false); name="msg.sender"; } :: 
+          { ty=VarT(UintBT); name="msg.value"; } :: xl,
+          Addr txfrom :: 
+          Uint txvalue :: txargs
         in
         let fr' = { callee = txto; locals = [bind_fargs_aargs xl' vl'] } in
         let st' = { accounts = st.accounts 
@@ -453,7 +455,7 @@ let default_value = function
 | EnumBT _    -> Uint 0
 
 let init_storage (Contract(_,_,vdl,_)) : ide -> exprval =
-  List.fold_left (fun acc vd -> 
+  List.fold_left (fun acc (vd : var_decl) -> 
     let (x,v) = (match vd.ty with 
       | VarT(t)     -> (vd.name, default_value t)
       | MapT(_,tv)  -> (vd.name, Map (fun _ -> (default_value tv)))
@@ -555,12 +557,12 @@ let exec_tx (n_steps : int) (tx: transaction) (st : sysstate) : (sysstate,string
           let xl',vl' =
             if deploy then match tx.txargs with 
               _::al -> 
-              { ty=VarT(AddrBT false); name="msg.sender"; visibility=Private; immutable=false; } :: xl,
+              { ty=VarT(AddrBT false); name="msg.sender"; } :: xl,
               Addr tx.txsender :: al
               | _ -> assert(false) (* should never happen *)
             else
-              { ty=VarT(AddrBT false); name="msg.sender"; visibility=Private; immutable=false; } :: 
-              { ty=VarT(UintBT); name="msg.value"; visibility=Private; immutable=false; } :: xl,
+              { ty=VarT(AddrBT false); name="msg.sender"; } :: 
+              { ty=VarT(UintBT); name="msg.value"; } :: xl,
               Addr tx.txsender :: Uint tx.txvalue :: tx.txargs
           in
           let fr' = { callee = tx.txto; locals = [bind_fargs_aargs xl' vl'] } in

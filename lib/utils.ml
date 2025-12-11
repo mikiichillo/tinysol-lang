@@ -195,6 +195,13 @@ let enumify_base_type (enums : enum_decl list) (bt : base_type) : base_type = ma
   | _ as other -> other
 
 let enumify_decls (enums : enum_decl list) (vdl : var_decl list) : var_decl list = List.map (
+  fun (vd:var_decl) -> match vd.ty with
+    | VarT(bt)   -> { vd with ty = VarT(enumify_base_type enums bt) } 
+    | MapT(bt1,bt2) -> { vd with ty = MapT(enumify_base_type enums bt1, enumify_base_type enums bt2) }
+  ) 
+  vdl 
+
+let enumify_local_decls (enums : enum_decl list) (vdl : local_var_decl list) : local_var_decl list = List.map (
   fun vd -> match vd.ty with
     | VarT(bt)   -> { vd with ty = VarT(enumify_base_type enums bt) } 
     | MapT(bt1,bt2) -> { vd with ty = MapT(enumify_base_type enums bt1, enumify_base_type enums bt2) }
@@ -202,15 +209,15 @@ let enumify_decls (enums : enum_decl list) (vdl : var_decl list) : var_decl list
   vdl 
 
 let rec enumify_cmd enums = function
-  | Block(vdl,c) -> Block(enumify_decls enums vdl, enumify_cmd enums c) 
+  | Block(vdl,c) -> Block(enumify_local_decls enums vdl, enumify_cmd enums c) 
   | _ as c -> c
 
 let enumify_fun enums = function
-  | Constr (al,c,p) -> Constr (enumify_decls enums al,enumify_cmd enums c,p)
-  | Proc (f,al,c,v,p,r) -> Proc(f,enumify_decls enums al,enumify_cmd enums c,v,p,r)
+  | Constr (al,c,p) -> Constr (enumify_local_decls enums al,enumify_cmd enums c,p)
+  | Proc (f,al,c,v,p,r) -> Proc(f,enumify_local_decls enums al,enumify_cmd enums c,v,p,r)
 
 let enumify_contract (Contract(c,enums,vdl,fdl)) =
-  Contract(c,enums,enumify_decls enums vdl,List.map (fun fd -> enumify_fun enums fd) fdl)
+  Contract(c,enums,enumify_decls enums vdl, List.map (fun fd -> enumify_fun enums fd) fdl)
 
 
 (******************************************************************************)

@@ -46,6 +46,7 @@ open Cli_ast
 %token CONTRACT
 %token CONSTR
 %token FUN
+%token RECEIVE
 %token RETURN
 %token INT
 %token UINT
@@ -63,6 +64,7 @@ open Cli_ast
 %token PUBLIC
 %token PRIVATE
 %token INTERNAL
+%token EXTERNAL
 %token PAYABLE
 %token IMMUTABLE
 %token RETURNS 
@@ -92,10 +94,11 @@ open Cli_ast
 %start <contract> contract
 %type <exprval> value
 %type <var_decl> var_decl
+%type <local_var_decl> local_var_decl
 %type <visibility_t> visibility_t
 %type <fun_decl> fun_decl
 %type <cmd> cmd
-%type <var_decl list> formal_args
+%type <local_var_decl list> formal_args
 %type <expr> expr 
 
 %start <cmd> cmd_eof
@@ -204,14 +207,20 @@ var_type:
   | MAPPING; LPAREN; t1 = base_type; opt_id; MAPSTO; t2 = base_type; opt_id; RPAREN { MapT(t1,t2) }
 
 visibility_t:
-  | PUBLIC { Public }
-  | PRIVATE { Private }
-  | INTERNAL { Internal }
+  | PUBLIC    { Public }
+  | PRIVATE   { Private }
+  | INTERNAL  { Internal }
+  | EXTERNAL  { External }
 ;
 
 var_decl:
   | t = var_type; i = opt_immutable; x = ID { { ty = t; name = x; visibility = Internal; immutable=i; } }
   | t = ID; i = opt_immutable; x = ID { { ty = VarT(CustomBT(t)); name = x; visibility = Internal; immutable = i; } }
+;
+
+local_var_decl:
+  | t = var_type; x = ID { { ty = t; name = x; } }
+  | t = ID; x = ID { { ty = VarT(CustomBT(t)); name = x; } }
 ;
 
 nonseq_cmd:
@@ -225,7 +234,7 @@ nonseq_cmd:
   | x = ID; LSQUARE; ek = expr; RSQUARE; ADDTAKES; ev = expr; CMDSEP; { MapW(x,ek,Add(MapR(Var x,ek),ev)) }
   | x = ID; LSQUARE; ek = expr; RSQUARE; SUBTAKES; ev = expr; CMDSEP; { MapW(x,ek,Sub(MapR(Var x,ek),ev)) }
   | rcv = expr; DOT; TRANSFER; LPAREN; amt=expr; RPAREN; CMDSEP; { Send(rcv,amt) }
-  | vd = var_decl; CMDSEP; { Decl(vd) }
+  | vd = local_var_decl; CMDSEP; { Decl(vd) }
   | e_to = expr; DOT; f = ID; e_value = opt_value; LPAREN; e_args = separated_list(ARGSEP, expr); RPAREN; CMDSEP; { ProcCall(e_to,f,e_value,e_args) }
 ;
 
@@ -257,16 +266,17 @@ fun_decl:
   | CONSTR; LPAREN; al = formal_args; RPAREN; p = opt_payable; LBRACE; c = opt_cmd; RBRACE { Constr(al,c,p) }
   /* function f(al) [public|private]? payable? returns(r)? { c } */
   | FUN; f = ID; LPAREN; al = formal_args; RPAREN; v=visibility_t; p = opt_payable; r = opt_returns; LBRACE; c = opt_cmd; RBRACE { Proc(f,al,c,v,p,r) }
+  | RECEIVE; LPAREN; al = formal_args; RPAREN; v=visibility_t; p = opt_payable; r = opt_returns; LBRACE; c = opt_cmd; RBRACE { Proc("receive",al,c,v,p,r) }
 ;
 
 formal_args:
   | a = separated_list(ARGSEP, formal_arg) { a } ;
 
 formal_arg:
-  | INT;  x = ID { { ty = VarT(IntBT); name = x; visibility = Private; immutable = false; } }
-  | UINT; x = ID { { ty = VarT(UintBT); name = x; visibility = Private; immutable = false; } }
-  | BOOL; x = ID { { ty = VarT(BoolBT); name = x; visibility = Private; immutable = false; } }
-  | ADDR; p = opt_payable; x = ID { { ty = VarT(AddrBT(p)); name = x; visibility = Private; immutable = false; } }
+  | INT;  x = ID { { ty = VarT(IntBT); name = x; } }
+  | UINT; x = ID { { ty = VarT(UintBT); name = x; } }
+  | BOOL; x = ID { { ty = VarT(BoolBT); name = x; } }
+  | ADDR; p = opt_payable; x = ID { { ty = VarT(AddrBT(p)); name = x; } }
 ;
 
 opt_value_tx:

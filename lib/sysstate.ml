@@ -201,7 +201,7 @@ let get_var_decls_from_fun = function
   | (Constr(vdl,_,_)) -> vdl
   | (Proc(_,vdl,_,_,_,_)) -> vdl
 
-let bind_fargs_aargs (xl : var_decl list) (vl : exprval list) : env =
+let bind_fargs_aargs (xl : local_var_decl list) (vl : exprval list) : env =
   if List.length xl <> List.length vl then
     failwith "exec_tx: length mismatch between formal and actual arguments"
   else 

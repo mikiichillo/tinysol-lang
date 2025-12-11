@@ -385,17 +385,19 @@ let%test "test_typecheck_mapping_3" = test_typecheck
   false
 
 let%test "test_typecheck_mapping_4" = test_typecheck 
-  "contract C {
-      // mappings cannot be local variables
+  "// mappings cannot be local variables
+  contract C {
       function f() public { mapping (uint => uint) m; m[0] = 1; }
-  }"
+  }
+  "
   false
 
 let%test "test_typecheck_mapping_5" = try 
-  "contract C {
-      // mappings cannot be local variables
+  "// mappings cannot be local variables
+  contract C {
       function f(mapping (uint => uint) m) public { m[0] = 1; }
-  }"
+  }
+  "
   |> parse_contract |> typecheck_contract |> fun _ ->  false
   with _ -> true
 
@@ -510,7 +512,8 @@ let%test "test_typecheck_ife_2" = test_typecheck
   true
 
 let%test "test_typecheck_ife_3" = test_typecheck 
-  "contract C {
+  "// both branches of a conditional expression must have the same type
+  contract C {
       int x;
       function f(int y,uint z) public { x = (y>5)?y:z; }
   }"
@@ -542,14 +545,14 @@ let%test "test_typecheck_ife_7" = test_typecheck
       uint x;
       function f(uint y) public { x = 1 - ((y>5)?4:5); }
   }"
-  false (* this is not type-checkable by solc *)
+  false (* this typechecking error is not detected by solc *)
 
 let%test "test_typecheck_ife_8" = test_typecheck 
   "contract C {
       uint x;
       function f(uint y) public { x = -4 + ((y>5)?4:5); }
   }"
-  true (* this is not type-checkable by solc *)
+  true (* this typechecking error is not detected by solc *)
 
 let%test "test_typecheck_enum_1" = test_typecheck
   "contract C { enum State {IDLE,REQ} State s; function f() public { s = State.REQ; } }"

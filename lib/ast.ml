@@ -47,17 +47,17 @@ type expr =
           
 and cmd =
   | Skip
-  | Assign of ide * expr          (* Variable assignment *)
-  | MapW of ide * expr * expr     (* Map assignment *)
-  | Seq of cmd * cmd              (* Sequencing *)
-  | If of expr * cmd * cmd        (* Conditional command *)
-  | Send of expr * expr           (* send(e1,e2) transfers e2 wei to e1 *)
-  | Req of expr                   (* require(e) reverts if e is false *) 
-  | Block of var_decl list * cmd  (* block with declarations *)
-  | ExecBlock of cmd              (* Runtime only: c is the cmd being reduced *)
-  | Decl of var_decl              (* Static-time only: Decl is converted into block*)
+  | Assign of ide * expr                (* Variable assignment *)
+  | MapW of ide * expr * expr           (* Map assignment *)
+  | Seq of cmd * cmd                    (* Sequencing *)
+  | If of expr * cmd * cmd              (* Conditional command *)
+  | Send of expr * expr                 (* send(e1,e2) transfers e2 wei to e1 *)
+  | Req of expr                         (* require(e) reverts if e is false *) 
+  | Block of local_var_decl list * cmd  (* block with declarations *)
+  | ExecBlock of cmd                    (* Runtime only: c is the cmd being reduced *)
+  | Decl of local_var_decl              (* Static-time only: Decl is converted into block*)
   | ProcCall of expr * ide * expr * expr list
-  | ExecProcCall of cmd           (* Runtime only: c is the cmd being reduced *)
+  | ExecProcCall of cmd                 (* Runtime only: c is the cmd being reduced *)
   | Return of expr
 
 (* Base types *)
@@ -81,6 +81,7 @@ and visibility_t =
   | Public 
   | Private
   | Internal
+  | External
 
 (* a variable declaration (t,x) consists of:
    - a type t
@@ -93,14 +94,16 @@ and visibility_t =
 
 and var_decl = { ty: var_type; name: ide; visibility: visibility_t; immutable: bool }
 
+and local_var_decl = { ty: var_type; name: ide; }
+
 (* Function declarations
   - the constructor is always public, and it can be payable
   - functions can be either public or private, and they can be payable
  *)
 
 and fun_decl =
-  | Constr of var_decl list * cmd * bool (* payable *)
-  | Proc of ide * var_decl list * cmd * visibility_t * bool * (base_type option) 
+  | Constr of local_var_decl list * cmd * bool (* payable *)
+  | Proc of ide * local_var_decl list * cmd * visibility_t * bool * (base_type option) 
 
 type enum_decl = Enum of (ide * ide list)
 

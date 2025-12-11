@@ -23,7 +23,7 @@ contract Vault {
         state = States.IDLE;
     }
 
-    function receive() public payable { }
+    receive() external payable { }
 
     function withdraw(address receiver_, uint amount_) public {
         require(state == States.IDLE);
@@ -42,7 +42,7 @@ contract Vault {
         require(msg.sender == owner);
 
         state = States.IDLE;	
-        receiver.transfer(amount);
+        payable(receiver).transfer(amount);
     }
 
     function cancel() public {

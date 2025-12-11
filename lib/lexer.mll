@@ -62,6 +62,7 @@ rule read_token =
   | "return" { RETURN }
   | "constructor" { CONSTR } 
   | "function" { FUN }
+  | "receive" { RECEIVE }
   | "," { ARGSEP }  
   | "int" { INT }
   | "uint" { UINT }
@@ -72,6 +73,7 @@ rule read_token =
   | "public" { PUBLIC }
   | "private" { PRIVATE }
   | "internal" { INTERNAL }
+  | "external" { EXTERNAL }
   | "payable" { PAYABLE }
   | "immutable" { IMMUTABLE }
   | "returns" { RETURNS }

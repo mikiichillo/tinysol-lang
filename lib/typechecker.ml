@@ -438,7 +438,7 @@ let rec typecheck_cmd (is_constr : bool) (edl : enum_decl list) (vdl : all_var_d
 
     | Decl(_) -> assert(false) (* should not happen after blockify *)
 
-    | ProcCall(_) -> failwith "TODO: Call"
+    | ProcCall(_) -> failwith "TODO: ProcCall"
 
     | ExecProcCall(_) -> assert(false) (* should not happen at static time *)
 

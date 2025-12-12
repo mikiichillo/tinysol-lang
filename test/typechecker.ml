@@ -621,3 +621,33 @@ let%test "test_typecheck_mutability_6" = test_typecheck
     function f() public payable { require(msg.value == 0); x = 2; }
   }"
   true
+
+let%test "test_typecheck_return_1" = test_typecheck
+  "contract C {
+    int x;
+    function f() public view returns (uint) { return(x>0); }
+  }"
+  false
+
+let%test "test_typecheck_return_2" = test_typecheck
+  "contract C {
+    int x;
+    function f(bool b) public view returns (uint) { return(!b); }
+  }"
+  false
+
+let%test "test_typecheck_proccall_1" = test_typecheck
+  "contract C {
+    int x;
+    function f(int y) public { x = y; }
+    function g() public { this.f(); }
+  }"
+  false
+
+let%test "test_typecheck_funcall_1" = test_typecheck
+  "contract C {
+    uint x;
+    function f() public pure returns(int) { return(1); }
+    function g() public { bool b; b = this.f(); }
+  }"
+  false

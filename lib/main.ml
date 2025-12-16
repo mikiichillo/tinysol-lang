@@ -559,7 +559,7 @@ let exec_tx (n_steps : int) (tx: transaction) (st : sysstate) : (sysstate,string
               |> bind tx.txsender sender_state
               |> bind tx.txto to_state; 
             callstack = st.callstack;
-            blocknum = 0;
+            blocknum = st.blocknum;
             active = tx.txto :: st.active }
       | Some (Proc(_,xl,c,_,m,_))
       | Some (Constr(xl,c,m)) ->
@@ -582,7 +582,7 @@ let exec_tx (n_steps : int) (tx: transaction) (st : sysstate) : (sysstate,string
                         |> bind tx.txsender sender_state
                         |> bind tx.txto to_state; 
                       callstack = fr' :: st.callstack;
-                      blocknum = 0;
+                      blocknum = st.blocknum;
                       active = if deploy then tx.txto :: st.active else st.active } in
           try (match exec_cmd n_steps c st' with
             | St st'' -> Ok (st'' |> pop_callstack)

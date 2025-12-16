@@ -330,6 +330,13 @@ transaction:
       txargs = al;
       txvalue = v;
   } }
+  | s = ADDRLIT; COLON; c = ADDRLIT; DOT; RECEIVE; v = opt_weivalue_tx; LPAREN; al = actual_args; RPAREN 
+  { { txsender = s;
+      txto = c;
+      txfun = "receive";
+      txargs = al;
+      txvalue = v;
+  } }
 ;
 
 cli_cmd:

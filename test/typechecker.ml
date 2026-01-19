@@ -595,3 +595,28 @@ let%test "test_issue1_state_var_public_ok" = test_typecheck
   }"
   true (* 'true' significa: mi aspetto che il typecheck PASSI *)
 
+(* ISSUE 2: La funzione receive() deve essere external payable *)
+let%test "test_issue2_receive_ok" = test_typecheck 
+  "contract C { 
+      receive() external payable {}  // CORRETTO: Niente parola 'function' prima
+  }"
+  true 
+
+let%test "test_issue2_receive_fail_visibility" = test_typecheck 
+  "contract C { 
+      receive() public payable {}    // Errore: non è external
+  }"
+  false
+
+let%test "test_issue2_receive_fail_mutability" = test_typecheck 
+  "contract C { 
+      receive() external {}          // Errore: non è payable
+  }"
+  false
+
+let%test "test_issue2_other_function_ok" = test_typecheck 
+  "contract C { 
+      function pippo() public {}     // Qui 'function' CI VUOLE perché è una funzione normale
+  }"
+  true
+

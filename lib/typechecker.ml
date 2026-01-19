@@ -464,6 +464,7 @@ let rec typecheck_cmd (f : ide) (edl : enum_decl list) (vdl : all_var_decls) = f
     | Return(_) -> failwith "TODO: Return"
 
 
+(*ISSUE 2*)
 let typecheck_fun (edl : enum_decl list) (vdl : var_decl list) = function
   | Constr (al,c,_) ->
       no_dup_local_var_decls "constructor" al
@@ -471,13 +472,25 @@ let typecheck_fun (edl : enum_decl list) (vdl : var_decl list) = function
       typecheck_local_decls "constructor" al
       >> 
       typecheck_cmd "constructor" edl (merge_var_decls vdl al) c
-  | Proc (f,al,c,_,__,_) ->
+
+  | Proc (f,al,c,vis,mut,_) ->
+      (* --- NUOVO CONTROLLO ISSUE 2 (Receive) --- *)
+      (if f = "receive" then
+         if vis <> External || mut <> Payable then
+           Error [Failure "The receive() function must be external payable"]
+         else Ok ()
+       else 
+         Ok ())
+      (* ----------------------------------------- *)
+      >>
+      (* --- VECCHI CONTROLLI--- *)
       no_dup_local_var_decls f al
       >> 
       typecheck_local_decls f al
       >>
       typecheck_cmd f edl (merge_var_decls vdl al) c
 
+      
 (* dup_first: finds the first duplicate in a list *)
 let rec dup_first (l : 'a list) : 'a option = match l with 
   | [] -> None

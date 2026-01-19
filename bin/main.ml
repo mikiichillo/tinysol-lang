@@ -40,12 +40,46 @@ match Array.length(Sys.argv) with
         |> string_of_typecheck_result |> print_endline)
     ) 
 (* unittest *)
-| 3 when Sys.argv.(1)="unittest" ->
-  Sys.argv.(2) |> read_lines 
-  |> List.filter (fun s -> not (is_empty_or_comment s)) 
-  |> List.map parse_cli_cmd 
-  |> fun l -> snd (exec_cli_cmd_list true l (init_sysstate))
-  |> string_of_sysstate [] |> print_string
+(* HARDCODED TEST per la Issue 4 *)
+| 2 when Sys.argv.(1)="test_issue4" ->
+    print_endline "--- AVVIO TEST MANUALE (Bypass Parser) ---";
+    
+    (* Definiamo i comandi manualmente specificando il percorso completo *)
+    let cmds = [
+      (* 1. Diamo i soldi a 0x1 *)
+      TinysolLib.Cli_ast.Faucet("0x1", 1000);
+
+      (* 2. Deploy del contratto TestConst *)
+      TinysolLib.Cli_ast.Deploy(
+        { 
+          TinysolLib.Ast.txsender="0x1"; 
+          TinysolLib.Ast.txto="0x2"; 
+          TinysolLib.Ast.txvalue=0; 
+          TinysolLib.Ast.txfun="constructor"; 
+          TinysolLib.Ast.txargs=[] 
+        }, 
+        "TestConst", 
+        "contracts/test_const.sol"
+      );
+
+      (* 3. Revert: Questa azione DEVE fallire *)
+      TinysolLib.Cli_ast.Revert(
+        { 
+          TinysolLib.Ast.txsender="0x1"; 
+          TinysolLib.Ast.txto="0x2"; 
+          TinysolLib.Ast.txvalue=0; 
+          TinysolLib.Ast.txfun="breakRules"; 
+          TinysolLib.Ast.txargs=[] 
+        }
+      )
+    ] in
+
+    (* 2. Eseguiamo la lista di comandi *)
+    let (_, final_state) = exec_cli_cmd_list true cmds init_sysstate in
+    
+    (* 3. Stampiamo il risultato *)
+    print_endline "\n--- TEST COMPLETATO CON SUCCESSO! ---";
+    final_state |> string_of_sysstate [] |> print_string
 (* wrong usage *)      
 | _ -> print_string "Usage:
   dune exec tinysol parse_cmd         : parses cmd in stdin

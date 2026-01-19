@@ -316,7 +316,43 @@ and step_cmd = function
     | Skip -> St st
 
     | Assign(x,e) when is_val e -> 
-        St (update_var st x (exprval_of_expr_typechecked e (type_of_var x st)))
+        let callee = (List.hd st.callstack).callee in
+        
+        (* 1. IDENTIKIT: Cerchiamo chi è 'x' (Con gestione errori per i Test Unitari) *)
+        let mutability_status = 
+          try
+            (* Proviamo a recuperare l'account. Se il test è "finto" e l'account non esiste, 
+               questa riga fallirà e andremo nel blocco 'with _ -> None' *)
+            let account = st.accounts callee in
+            
+            match account.code with
+            | Some (Contract(_, _, (vars : Ast.var_decl list), _)) -> 
+                (try 
+                   let found_var = List.find (fun (v : Ast.var_decl) -> v.name = x) vars in
+                   Some found_var.mutability
+                 with Not_found -> None) 
+            | None -> None
+          with _ -> None (* Se l'account non esiste (siamo in un test unitario), ignoriamo i controlli *)
+        in
+
+        (* 2. CONTROLLI DI SICUREZZA *)
+        (match mutability_status with
+         (* CASO A: È una Costante? *)
+         | Some Ast.Constant -> 
+             Reverted ("Cannot assign to constant variable " ^ x)
+             
+         (* CASO B: È Immutabile? *)
+         | Some Ast.Immutable ->
+             (match lookup_var x st with
+              | Some _ -> 
+                  Reverted ("Cannot reassign immutable variable " ^ x)
+              | None -> 
+                  St (update_var st x (exprval_of_expr_typechecked e (type_of_var x st))))
+               
+         (* CASO C: È Mutabile, Locale o Test Unitario? *)
+         | _ -> 
+             St (update_var st x (exprval_of_expr_typechecked e (type_of_var x st)))
+        )
         
     | Assign(x,e) -> 
       let (e', st') = step_expr (e, st) in CmdSt(Assign(x,e'), st')

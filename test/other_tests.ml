@@ -299,3 +299,45 @@ let%test "test_issue3_receive_activation" = test_exec_fun
      2. Sender (0xD): balance deve essere 99 (ha speso 1) *)
   [("0xC", "count==1 && this.balance==1"); 
    ("0xD", "this.balance==99")]
+
+
+   (* --- NUOVI TEST ISSUE 11: Runtime Constant/Immutable Checks --- *)
+
+(* TEST 1: Violazione di COSTANTE (Runtime) *)
+(* Ci aspettiamo che questo test FALLISCA con errore "Reverted" *)
+let%test "test_runtime_constant_violation" = 
+  try 
+    test_exec_fun 
+      "contract ConstTest { 
+         uint constant X = 10; 
+         function set() public { 
+           X = 20; 
+         } 
+       }" 
+      "" 
+      ["0xA:0xC.set()"] 
+      [("0xC", "")] 
+      |> fun _ -> false (* Se non fallisce, il test è sbagliato -> return false *)
+  with 
+  | Failure msg when msg = "Reverted: Cannot assign to constant variable X" -> true (* Se da l'errore giusto -> OK *)
+  | _ -> false (* Se da un errore diverso -> NO *)
+
+(* TEST 2: Violazione di IMMUTABILE (Runtime) *)
+(* Ci aspettiamo che questo test FALLISCA con errore "Reverted" *)
+let%test "test_runtime_immutable_violation" = 
+  try 
+    test_exec_fun 
+      "contract ImmutTest { 
+         uint immutable Y; 
+         constructor() { Y = 1; } 
+         function set() public { 
+           Y = 2; 
+         } 
+       }" 
+      "" 
+      ["0xA:0xC.set()"] 
+      [("0xC", "")] 
+      |> fun _ -> false 
+  with 
+  | Failure msg when msg = "Reverted: Cannot reassign immutable variable Y" -> true
+  | _ -> false

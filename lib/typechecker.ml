@@ -494,6 +494,33 @@ let typecheck_enums (edl : enum_decl list) =
     (Ok ()) 
     edl
 
+
+(* Controllo visibilità variabili di stato: Issue 1 *)
+let check_state_var_visibility vdl = 
+  List.fold_left (fun acc (vd : var_decl) ->
+    match acc with
+    (* CASO 1: Se finora non ci sono errori (Ok) *)
+    | Ok () -> 
+        if vd.visibility = External then 
+          (* Trovato il primo errore! Lo segnaliamo *)
+          Error [Failure ("State variable " ^ vd.name ^ " cannot be external")]
+        else 
+          (* Tutto ancora ok, continuiamo *)
+          Ok ()
+
+    (* CASO 2: Se c'erano già errori in precedenza *)
+    | Error log -> 
+        if vd.visibility = External then 
+          (* Trovato un altro errore: lo aggiungiamo alla lista esistente (@) *)
+          Error (log @ [Failure ("State variable " ^ vd.name ^ " cannot be external")])
+        else 
+          (* Nessun nuovo errore qui, manteniamo quelli vecchi *)
+          Error log
+
+  ) (Ok ()) vdl
+
+
+
 (* typecheck_contract : contract -> (unit,string) result 
     Perform several static checks on a given contract. The result is:
     - Ok () if all checks succeed 
@@ -507,10 +534,14 @@ let typecheck_contract (Contract(_,edl,vdl,fdl)) : typecheck_result =
   (* no multiply declared state variables *)
   no_dup_var_decls vdl
   >>
+  (* --- NUOVO CONTROLLO ISSUE 1 --- *)
+  check_state_var_visibility vdl
+  >>
+  (* ------------------------------- *)
   (* no multiply declared functions *)
   no_dup_fun_decls fdl
   >>
-  List.fold_left (fun acc fd -> acc >> typecheck_fun edl vdl fd) (Ok ()) fdl  
+  List.fold_left (fun acc fd -> acc >> typecheck_fun edl vdl fd) (Ok ()) fdl 
 
 
 let string_of_typecheck_result = function

@@ -578,3 +578,20 @@ let%test "test_typecheck_enum_6" = test_typecheck
   "contract C { enum E1 {A1,B1} enum E2 {A2,B2} enum E1 {A1,B1} E1 s; function f() public { s = E1.A1; } }"
   false
 
+
+(* --- NUOVI TEST PER LE ISSUE ASSEGNATE --- *)
+
+(* ISSUE 1: State variables cannot have external visibility *)
+let%test "test_issue1_state_var_external_fails" = test_typecheck 
+  "contract FailExternalVar {
+      uint external x; // Questo DEVE causare un errore
+  }"
+  false (* 'false' significa: mi aspetto che il typecheck FALLISCA *)
+
+(* ISSUE 1: Verifica che Public continui a funzionare *)
+let%test "test_issue1_state_var_public_ok" = test_typecheck 
+  "contract OkPublicVar {
+      uint public x; // Questo deve passare
+  }"
+  true (* 'true' significa: mi aspetto che il typecheck PASSI *)
+

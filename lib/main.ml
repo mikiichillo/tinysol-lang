@@ -316,8 +316,33 @@ and step_cmd = function
     | Skip -> St st
 
     | Assign(x,e) when is_val e -> 
-        St (update_var st x (exprval_of_expr_typechecked e (type_of_var x st)))
-        
+        (* 1. Recuperiamo chi sta eseguendo il codice (il contratto corrente) *)
+        let callee = (List.hd st.callstack).callee in
+        let acc = st.accounts callee in
+
+        (* 2. Controlliamo nel "codice sorgente" del contratto se la variabile è bloccata *)
+        let is_read_only = match acc.code with
+          | Some(Contract(_,_,vdl,_)) -> 
+              (* Cerchiamo la variabile 'x' nella lista delle variabili di stato (vdl) *)
+              begin match List.find_opt (fun (vd: var_decl) -> vd.name = x) vdl with
+              | Some vd -> 
+                  (* Trovata! Se non è Mutable, allora è read-only (Constant o Immutable) *)
+                  vd.mutability <> Mutable
+              | None -> 
+                  (* Non trovata nelle variabili di stato, quindi è una variabile locale. *)
+                  (* Le locali sono sempre mutabili, quindi nessun problema. *)
+                  false
+              end
+          | None -> false (* Non dovrebbe succedere in esecuzione *)
+        in
+
+        (* 3. Il Bivio: Blocca o Esegui *)
+        if is_read_only then
+           Reverted ("Runtime Error: Cannot assign to immutable or constant variable " ^ x)
+        else
+           (* Comportamento originale: aggiorna la variabile *)
+           St (update_var st x (exprval_of_expr_typechecked e (type_of_var x st)))
+
     | Assign(x,e) -> 
       let (e', st') = step_expr (e, st) in CmdSt(Assign(x,e'), st')
 

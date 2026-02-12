@@ -316,7 +316,43 @@ and step_cmd = function
     | Skip -> St st
 
     | Assign(x,e) when is_val e -> 
-        St (update_var st x (exprval_of_expr_typechecked e (type_of_var x st)))
+        let callee = (List.hd st.callstack).callee in
+        
+        (* 1. IDENTIKIT: Cerchiamo chi è 'x' (Con gestione errori per i Test Unitari) *)
+        let mutability_status = 
+          try
+            (* Proviamo a recuperare l'account. Se il test è "finto" e l'account non esiste, 
+               questa riga fallirà e andremo nel blocco 'with _ -> None' *)
+            let account = st.accounts callee in
+            
+            match account.code with
+            | Some (Contract(_, _, (vars : Ast.var_decl list), _)) -> 
+                (try 
+                   let found_var = List.find (fun (v : Ast.var_decl) -> v.name = x) vars in
+                   Some found_var.mutability
+                 with Not_found -> None) 
+            | None -> None
+          with _ -> None (* Se l'account non esiste (siamo in un test unitario), ignoriamo i controlli *)
+        in
+
+        (* 2. CONTROLLI DI SICUREZZA *)
+        (match mutability_status with
+         (* CASO A: È una Costante? *)
+         | Some Ast.Constant -> 
+             Reverted ("Cannot assign to constant variable " ^ x)
+             
+         (* CASO B: È Immutabile? *)
+         | Some Ast.Immutable ->
+             (match lookup_var x st with
+              | Some _ -> 
+                  Reverted ("Cannot reassign immutable variable " ^ x)
+              | None -> 
+                  St (update_var st x (exprval_of_expr_typechecked e (type_of_var x st))))
+               
+         (* CASO C: È Mutabile, Locale o Test Unitario? *)
+         | _ -> 
+             St (update_var st x (exprval_of_expr_typechecked e (type_of_var x st)))
+        )
         
     | Assign(x,e) -> 
       let (e', st') = step_expr (e, st) in CmdSt(Assign(x,e'), st')
@@ -347,18 +383,59 @@ and step_cmd = function
         CmdSt(If(e',c1,c2), st')
 
     | Send(ercv,eamt) when is_val ercv && is_val eamt -> 
+        (* 1. PREPARAZIONE DATI (Come prima) *)
         let rcv = addr_of_expr ercv in 
         let amt = int_of_expr eamt in
         let from = (List.hd st.callstack).callee in 
         let from_bal = (st.accounts from).balance in
-        if from_bal<amt then Reverted "insufficient balance" else
-        let from_state =  { (st.accounts from) with balance = from_bal - amt } in
-        if exists_account st rcv then
-          let rcv_state = { (st.accounts rcv) with balance = (st.accounts rcv).balance + amt } in
-           St { st with accounts = st.accounts |> bind rcv rcv_state |> bind from from_state}
+        
+        if from_bal < amt then Reverted "insufficient balance" 
         else
-          let rcv_state = { balance = amt; storage = botenv; code = None; } in
-          St { st with accounts = st.accounts |> bind rcv rcv_state |> bind from from_state; active = rcv::st.active }
+          (* 2. PRELIEVO (Come prima): togliamo i soldi al mittente *)
+          let from_state = { (st.accounts from) with balance = from_bal - amt } in
+          
+          (* 3. CONTROLLO DESTINATARIO *)
+          if exists_account st rcv then
+            (* AGGIORNAMENTO SALDO: Aggiungiamo i soldi al destinatario *)
+            let rcv_state = { (st.accounts rcv) with balance = (st.accounts rcv).balance + amt } in
+            
+            (* Creiamo lo stato temporaneo 'st'' con i soldi già spostati *)
+            let st' = { st with accounts = st.accounts |> bind rcv rcv_state |> bind from from_state} in
+            
+            (* --- INIZIO LOGICA ISSUE 3 --- *)
+            (* Controlliamo se il destinatario ha del codice (è un contratto?) *)
+            match rcv_state.code with
+            | Some contract -> 
+                (* È un contratto! Cerchiamo se ha la funzione "receive" *)
+                (match find_fun_in_contract contract "receive" with
+                 | Some (Proc(_, _, body, _, _, _)) ->
+                     (* TROVATA! Dobbiamo eseguirla. *)
+                     
+                     (* A. Prepariamo le variabili: chi manda (msg.sender) e quanto (msg.value) *)
+                     let locals = [
+                       bind_fargs_aargs 
+                         [{ty=VarT(AddrBT false); name="msg.sender"}; {ty=VarT(UintBT); name="msg.value"}] 
+                         [Addr from; Uint amt]
+                     ] in
+                     
+                     (* B. Creiamo un nuovo "frame" (contesto) nello stack per la chiamata *)
+                     let new_frame = { callee = rcv; locals = locals } in
+                     let st_exec = { st' with callstack = new_frame :: st'.callstack } in
+                     
+                     (* C. Invece di finire (St), diciamo all'interprete: 
+                        "Il prossimo comando da fare è il corpo della funzione receive" *)
+                     CmdSt(ExecProcCall(body), st_exec)
+                     
+                 | _ -> St st') (* Caso: È un contratto ma NON ha receive -> Solo trasferimento, finito. *)
+            
+            | None -> St st' (* Caso: È un account umano -> Solo trasferimento, finito. *)
+            (* --- FINE LOGICA ISSUE 3 --- *)
+
+          else
+            (* Caso: Il destinatario non esiste proprio (creiamo account vuoto) - Rimane uguale a prima *)
+            let rcv_state = { balance = amt; storage = botenv; code = None; } in
+            St { st with accounts = st.accounts |> bind rcv rcv_state |> bind from from_state;
+                 active = rcv::st.active }
 
     | Send(ercv,eamt) when is_val ercv -> 
         let (eamt', st') = step_expr (eamt, st) in

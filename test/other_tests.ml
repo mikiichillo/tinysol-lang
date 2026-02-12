@@ -271,3 +271,73 @@ let%test "test_typecheck_constant_4" = test_typecheck
     function f(int n) external { }
   }"
   false
+
+
+(* --- NUOVO TEST ISSUE 3: Receive activation --- *)
+
+let%test "test_issue3_receive_activation" = test_exec_fun
+  (* Contratto Receiver: ha la funzione receive() che incrementa count *)
+  "contract Receiver { 
+      uint count;
+      receive() external payable { 
+          count = count + 1; 
+      }
+  }"
+  (* Contratto Sender: invia soldi al Receiver *)
+  "contract Sender { 
+      Receiver r;
+      constructor() payable { r = \"0xC\"; } (* 0xC è l'indirizzo del Receiver *)
+      
+      function sendMoney() public {
+          address(r).transfer(1); (* Invia 1 wei, deve attivare receive() *)
+      }
+  }"
+  (* Eseguiamo la funzione sendMoney del Sender (che è all'indirizzo 0xD) *)
+  ["0xA:0xD.sendMoney()"] 
+  (* Controlli finali: 
+     1. Receiver (0xC): count deve essere 1 e balance deve essere 1 (ha ricevuto i soldi)
+     2. Sender (0xD): balance deve essere 99 (ha speso 1) *)
+  [("0xC", "count==1 && this.balance==1"); 
+   ("0xD", "this.balance==99")]
+
+
+   (* --- NUOVI TEST ISSUE 11: Runtime Constant/Immutable Checks --- *)
+
+(* TEST 1: Violazione di COSTANTE (Runtime) *)
+(* Ci aspettiamo che questo test FALLISCA con errore "Reverted" *)
+let%test "test_runtime_constant_violation" = 
+  try 
+    test_exec_fun 
+      "contract ConstTest { 
+         uint constant X = 10; 
+         function set() public { 
+           X = 20; 
+         } 
+       }" 
+      "" 
+      ["0xA:0xC.set()"] 
+      [("0xC", "")] 
+      |> fun _ -> false (* Se non fallisce, il test è sbagliato -> return false *)
+  with 
+  | Failure msg when msg = "Reverted: Cannot assign to constant variable X" -> true (* Se da l'errore giusto -> OK *)
+  | _ -> false (* Se da un errore diverso -> NO *)
+
+(* TEST 2: Violazione di IMMUTABILE (Runtime) *)
+(* Ci aspettiamo che questo test FALLISCA con errore "Reverted" *)
+let%test "test_runtime_immutable_violation" = 
+  try 
+    test_exec_fun 
+      "contract ImmutTest { 
+         uint immutable Y; 
+         constructor() { Y = 1; } 
+         function set() public { 
+           Y = 2; 
+         } 
+       }" 
+      "" 
+      ["0xA:0xC.set()"] 
+      [("0xC", "")] 
+      |> fun _ -> false 
+  with 
+  | Failure msg when msg = "Reverted: Cannot reassign immutable variable Y" -> true
+  | _ -> false

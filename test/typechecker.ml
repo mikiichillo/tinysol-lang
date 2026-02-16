@@ -445,6 +445,14 @@ let%test "test_typecheck_mapping_11" = test_typecheck
   }"
   true
 
+let%test "test_typecheck_mapping_12" = test_typecheck 
+  "contract C {
+      mapping (int => int) m;
+      int x;
+      function f() public { if (m[int(1)]==0) x=2; }
+  }"
+  true
+
 let%test "test_typecheck_immutable_1" = test_typecheck 
   "contract C {
       int immutable y;

@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.1;
+// SPDX-License-Identifier: GPL-3.0-only
+pragma solidity >= 0.8.2;
 
 contract SimpleTransfer {
 
@@ -7,8 +7,8 @@ contract SimpleTransfer {
     address owner;
 
     constructor(address _recipient){
-        recipient = _recipient;
-        owner = msg.sender;
+       recipient = _recipient;
+       owner = msg.sender;
     }
 
     function deposit() public payable {
@@ -21,5 +21,4 @@ contract SimpleTransfer {
 
         payable(recipient).transfer(amount);
     }
-
 }

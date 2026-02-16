@@ -533,16 +533,31 @@ and step_cmd = function
 
 (* Recursively evaluate expression until it reaches a value (might not terminate) *)
 
+(* Valuta ricorsivamente un'espressione fino a ottenere un valore finale.
+   Se l'espressione è già un valore, lo converte direttamente in exprval.
+   Altrimenti, esegue un passo di riduzione (step_expr) ottenendo una nuova 
+   espressione e un nuovo stato del sistema, poi continua ricorsivamente 
+   la valutazione con il nuovo stato. *)
 let rec eval_expr (st : sysstate) (e : expr) : exprval = 
   if is_val e then exprval_of_expr e
-  else let (e', st') = step_expr (e, st) in eval_expr st' e'  
+  else let (e', st') = step_expr (e, st) in eval_expr st' e'
 
+(* Restituisce il valore di default per ogni tipo base in Solidity.
+   Questo rispecchia il comportamento di Solidity dove le variabili 
+   non inizializzate hanno valori di default predefiniti:
+   - tipi interi (int/uint): 0
+   - bool: false
+   - address: indirizzo zero "0x0"
+   - enum: 0 (primo valore dell'enumerazione)
+   - contract: indirizzo zero "0x0"
+   Il caso UnknownBT non dovrebbe mai verificarsi dopo il preprocessing 
+   del contratto. *)
 let default_var_value = function 
 | IntBT       -> Int 0
 | UintBT      -> Uint 0
 | BoolBT      -> Bool false
 | AddrBT _    -> Addr "0x0"
-| UnknownBT _ -> assert(false) (* should not happen after contract preprocessing *)
+| UnknownBT _ -> assert(false) (* non dovrebbe accadere dopo il preprocessing del contratto *)
 | EnumBT _    -> Uint 0
 | ContractBT _-> Addr "0x0"
 

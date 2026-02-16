@@ -695,10 +695,13 @@ let exec_tx_list (n_steps : int) (txl : transaction list) (st : sysstate) =
 (******************************************************************************)
 
 let deploy_contract (tx : transaction) (src : string) (st : sysstate) : sysstate =
+  (* Check iniziali: indirizzo libero e chiamata obbligatoria al constructor *)
   if exists_account st tx.txto then 
     failwith ("deploy_contract: address " ^ tx.txto ^ " already bound in sysstate")
   else if tx.txfun <> "constructor" then
     failwith ("deploy_contract: deploying a contract must call the constructor")
+  
+  (* Esecuzione con src aggiunto agli argomenti; se fallisce ignora le modifiche *)
   else let tx' = { tx with txargs = Addr(src) :: tx.txargs }
   in match exec_tx 1000 tx' st with
     | Ok st' -> st'

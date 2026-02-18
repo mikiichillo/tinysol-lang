@@ -313,11 +313,8 @@ let%test "test_issue7_receive_activation" = test_exec_fun
         function f(address a) public { payable(a).transfer(1); }
     }"
     (* Sequenza di azioni:
-      1. Deploy automatico dei due contratti (il framework di test lo fa per te)
+      1. Deploy automatico dei due contratti
       2. Chiamiamo D.f() passando l'indirizzo di C. 
-          Nota: Assumiamo che il framework assegni indirizzi sequenziali o nomi noti.
-          Se il framework usa i nomi dei contratti come indirizzi, useremo "C".
-          Se usa 0x0, 0x1, controlla come si comporta test_exec_fun.
     *)
     ["0xD.f(0xC)"] 
     

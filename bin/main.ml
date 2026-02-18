@@ -40,8 +40,8 @@ match Array.length(Sys.argv) with
         |> string_of_typecheck_result |> print_endline)
     ) 
 (* unittest *)
-(* HARDCODED TEST per la Issue 4 *)
-| 2 when Sys.argv.(1)="test_issue4" ->
+(* HARDCODED TEST per la Issue 11 *)
+| 2 when Sys.argv.(1)="test_issue11" ->
     print_endline "--- AVVIO TEST MANUALE (Bypass Parser) ---";
     
     (* Definiamo i comandi manualmente specificando il percorso completo *)

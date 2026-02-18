@@ -318,6 +318,7 @@ and step_cmd = function
     | Assign(x,e) when is_val e -> 
         let callee = (List.hd st.callstack).callee in
         
+      (*ISSUE 11*)
         (* 1. IDENTIKIT: Cerchiamo chi è 'x' (Con gestione errori per i Test Unitari) *)
         let mutability_status = 
           try
@@ -402,7 +403,7 @@ and step_cmd = function
             (* Creiamo lo stato temporaneo 'st'' con i soldi già spostati *)
             let st' = { st with accounts = st.accounts |> bind rcv rcv_state |> bind from from_state} in
             
-            (* --- INIZIO LOGICA ISSUE 3 --- *)
+            (* --- INIZIO LOGICA ISSUE 7 --- *)
             (* Controlliamo se il destinatario ha del codice (è un contratto?) *)
             match rcv_state.code with
             | Some contract -> 
@@ -429,7 +430,7 @@ and step_cmd = function
                  | _ -> St st') (* Caso: È un contratto ma NON ha receive -> Solo trasferimento, finito. *)
             
             | None -> St st' (* Caso: È un account umano -> Solo trasferimento, finito. *)
-            (* --- FINE LOGICA ISSUE 3 --- *)
+            (* --- FINE LOGICA ISSUE 7 --- *)
 
           else
             (* Caso: Il destinatario non esiste proprio (creiamo account vuoto) - Rimane uguale a prima *)

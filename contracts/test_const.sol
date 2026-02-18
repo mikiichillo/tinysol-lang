@@ -4,7 +4,7 @@ contract TestConst {
 
     function breakRules() public {
         // Tenta di cambiarla a 20.
-        // Se la tua modifica funziona, questo deve fallire.
+        // Se la modifica funziona, questo deve fallire.
         myNum = 20;
     }
 }

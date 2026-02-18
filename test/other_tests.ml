@@ -273,9 +273,9 @@ let%test "test_typecheck_constant_4" = test_typecheck
   false
 
 
-(* --- NUOVO TEST ISSUE 3: Receive activation --- *)
+(* --- NUOVO TEST ISSUE 7: Receive activation --- *)
 
-let%test "test_issue3_receive_activation" = test_exec_fun
+let%test "test_issue7_receive_activation" = test_exec_fun
   (* Contratto Receiver: ha la funzione receive() che incrementa count *)
   "contract Receiver { 
       uint count;

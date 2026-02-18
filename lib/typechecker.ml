@@ -464,7 +464,7 @@ let rec typecheck_cmd (f : ide) (edl : enum_decl list) (vdl : all_var_decls) = f
     | Return(_) -> failwith "TODO: Return"
 
 
-(*ISSUE 2*)
+(*ISSUE 6*)
 let typecheck_fun (edl : enum_decl list) (vdl : var_decl list) = function
   | Constr (al,c,_) ->
       no_dup_local_var_decls "constructor" al
@@ -474,7 +474,7 @@ let typecheck_fun (edl : enum_decl list) (vdl : var_decl list) = function
       typecheck_cmd "constructor" edl (merge_var_decls vdl al) c
 
   | Proc (f,al,c,vis,mut,_) ->
-      (* --- NUOVO CONTROLLO ISSUE 2 (Receive) --- *)
+      (* --- NUOVO CONTROLLO ISSUE 6 (Receive) --- *)
       (if f = "receive" then
          if vis <> External || mut <> Payable then
            Error [Failure "The receive() function must be external payable"]
@@ -508,7 +508,7 @@ let typecheck_enums (edl : enum_decl list) =
     edl
 
 
-(* Controllo visibilità variabili di stato: Issue 1 *)
+(* Controllo visibilità variabili di stato: Issue 5 *)
 let check_state_var_visibility vdl = 
   List.fold_left (fun acc (vd : var_decl) ->
     match acc with
@@ -547,10 +547,9 @@ let typecheck_contract (Contract(_,edl,vdl,fdl)) : typecheck_result =
   (* no multiply declared state variables *)
   no_dup_var_decls vdl
   >>
-  (* --- NUOVO CONTROLLO ISSUE 1 --- *)
+  (* --- NUOVO CONTROLLO ISSUE 5 --- *)
   check_state_var_visibility vdl
   >>
-  (* ------------------------------- *)
   (* no multiply declared functions *)
   no_dup_fun_decls fdl
   >>

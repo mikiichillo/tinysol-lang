@@ -318,6 +318,7 @@ and step_cmd = function
     | Assign(x,e) when is_val e -> 
         let callee = (List.hd st.callstack).callee in
         
+      (*ISSUE 11*)
         (* 1. IDENTIKIT: Cerchiamo chi è 'x' (Con gestione errori per i Test Unitari) *)
         let mutability_status = 
           try
@@ -402,7 +403,7 @@ and step_cmd = function
             (* Creiamo lo stato temporaneo 'st'' con i soldi già spostati *)
             let st' = { st with accounts = st.accounts |> bind rcv rcv_state |> bind from from_state} in
             
-            (* --- INIZIO LOGICA ISSUE 3 --- *)
+            (* --- INIZIO LOGICA ISSUE 7 --- *)
             (* Controlliamo se il destinatario ha del codice (è un contratto?) *)
             match rcv_state.code with
             | Some contract -> 
@@ -429,7 +430,7 @@ and step_cmd = function
                  | _ -> St st') (* Caso: È un contratto ma NON ha receive -> Solo trasferimento, finito. *)
             
             | None -> St st' (* Caso: È un account umano -> Solo trasferimento, finito. *)
-            (* --- FINE LOGICA ISSUE 3 --- *)
+            (* --- FINE LOGICA ISSUE 7 --- *)
 
           else
             (* Caso: Il destinatario non esiste proprio (creiamo account vuoto) - Rimane uguale a prima *)
@@ -533,16 +534,31 @@ and step_cmd = function
 
 (* Recursively evaluate expression until it reaches a value (might not terminate) *)
 
+(* Valuta ricorsivamente un'espressione fino a ottenere un valore finale.
+   Se l'espressione è già un valore, lo converte direttamente in exprval.
+   Altrimenti, esegue un passo di riduzione (step_expr) ottenendo una nuova 
+   espressione e un nuovo stato del sistema, poi continua ricorsivamente 
+   la valutazione con il nuovo stato. *)
 let rec eval_expr (st : sysstate) (e : expr) : exprval = 
   if is_val e then exprval_of_expr e
-  else let (e', st') = step_expr (e, st) in eval_expr st' e'  
+  else let (e', st') = step_expr (e, st) in eval_expr st' e'
 
+(* Restituisce il valore di default per ogni tipo base in Solidity.
+   Questo rispecchia il comportamento di Solidity dove le variabili 
+   non inizializzate hanno valori di default predefiniti:
+   - tipi interi (int/uint): 0
+   - bool: false
+   - address: indirizzo zero "0x0"
+   - enum: 0 (primo valore dell'enumerazione)
+   - contract: indirizzo zero "0x0"
+   Il caso UnknownBT non dovrebbe mai verificarsi dopo il preprocessing 
+   del contratto. *)
 let default_var_value = function 
 | IntBT       -> Int 0
 | UintBT      -> Uint 0
 | BoolBT      -> Bool false
 | AddrBT _    -> Addr "0x0"
-| UnknownBT _ -> assert(false) (* should not happen after contract preprocessing *)
+| UnknownBT _ -> assert(false) (* non dovrebbe accadere dopo il preprocessing del contratto *)
 | EnumBT _    -> Uint 0
 | ContractBT _-> Addr "0x0"
 
@@ -695,10 +711,13 @@ let exec_tx_list (n_steps : int) (txl : transaction list) (st : sysstate) =
 (******************************************************************************)
 
 let deploy_contract (tx : transaction) (src : string) (st : sysstate) : sysstate =
+  (* Check iniziali: indirizzo libero e chiamata obbligatoria al constructor *)
   if exists_account st tx.txto then 
     failwith ("deploy_contract: address " ^ tx.txto ^ " already bound in sysstate")
   else if tx.txfun <> "constructor" then
     failwith ("deploy_contract: deploying a contract must call the constructor")
+  
+  (* Esecuzione con src aggiunto agli argomenti; se fallisce ignora le modifiche *)
   else let tx' = { tx with txargs = Addr(src) :: tx.txargs }
   in match exec_tx 1000 tx' st with
     | Ok st' -> st'

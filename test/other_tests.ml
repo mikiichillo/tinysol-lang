@@ -300,8 +300,34 @@ let%test "test_issue3_receive_activation" = test_exec_fun
   [("0xC", "count==1 && this.balance==1"); 
    ("0xD", "this.balance==99")]
 
+   (* Test con i contratti creati dal professore *)
+   let%test "Prof_Issue3_Transfer_Triggers_Receive" = test_exec_fun
+    (* Contratto C del prof *)
+    "contract C { 
+        uint x; 
+        receive() external payable { x = 5; }
+    }"
+    (* Contratto D del prof *)
+    "contract D { 
+        constructor() payable { } 
+        function f(address a) public { payable(a).transfer(1); }
+    }"
+    (* Sequenza di azioni:
+      1. Deploy automatico dei due contratti (il framework di test lo fa per te)
+      2. Chiamiamo D.f() passando l'indirizzo di C. 
+          Nota: Assumiamo che il framework assegni indirizzi sequenziali o nomi noti.
+          Se il framework usa i nomi dei contratti come indirizzi, useremo "C".
+          Se usa 0x0, 0x1, controlla come si comporta test_exec_fun.
+    *)
+    ["0xD.f(0xC)"] 
+    
+    (* Verifica Finale:
+      In C, la variabile x deve essere 5.
+    *)
+    [("0xC", "x==5")]
 
-   (* --- NUOVI TEST ISSUE 11: Runtime Constant/Immutable Checks --- *)
+
+(* --- NUOVI TEST ISSUE 11: Runtime Constant/Immutable Checks --- *)
 
 (* TEST 1: Violazione di COSTANTE (Runtime) *)
 (* Ci aspettiamo che questo test FALLISCA con errore "Reverted" *)
